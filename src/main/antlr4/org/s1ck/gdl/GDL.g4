@@ -77,7 +77,7 @@ properties
     ;
 
 property
-    : Identifier Colon literal
+    : Identifier Colon (literal | listLiteral)
     ;
 
 label
@@ -121,6 +121,14 @@ parenthesizedExpression : '(' expression ')' ;
 
 propertyLookup
     : Identifier '.' Identifier
+    ;
+
+listLiteral
+    : '[' WS? literalList WS? ']'
+    ;
+
+literalList
+    : (literal (',' WS? literal)* )?
     ;
 
 literal

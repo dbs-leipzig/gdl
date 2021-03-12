@@ -17,23 +17,29 @@ package org.s1ck.gdl;
 
 import org.antlr.v4.runtime.RuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.s1ck.gdl.exceptions.DuplicateDeclarationException;
 import org.s1ck.gdl.exceptions.InvalidReferenceException;
-import org.s1ck.gdl.model.*;
+import org.s1ck.gdl.model.Edge;
+import org.s1ck.gdl.model.Graph;
+import org.s1ck.gdl.model.GraphElement;
+import org.s1ck.gdl.model.Vertex;
+import org.s1ck.gdl.model.comparables.ComparableExpression;
 import org.s1ck.gdl.model.comparables.ElementSelector;
+import org.s1ck.gdl.model.comparables.Literal;
+import org.s1ck.gdl.model.comparables.PropertySelector;
+import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.comparables.time.TimeLiteral;
 import org.s1ck.gdl.model.predicates.booleans.And;
-import org.s1ck.gdl.model.predicates.expressions.Comparison;
-import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.predicates.booleans.Not;
 import org.s1ck.gdl.model.predicates.booleans.Or;
 import org.s1ck.gdl.model.predicates.booleans.Xor;
-import org.s1ck.gdl.model.comparables.ComparableExpression;
-import org.s1ck.gdl.model.comparables.Literal;
-import org.s1ck.gdl.model.comparables.PropertySelector;
+import org.s1ck.gdl.model.predicates.expressions.Comparison;
 import org.s1ck.gdl.utils.Comparator;
+import org.s1ck.gdl.utils.ContinuousId;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 class GDLLoader extends GDLBaseListener {
@@ -67,10 +73,10 @@ class GDLLoader extends GDLBaseListener {
     private final String defaultVertexLabel;
     private final String defaultEdgeLabel;
 
-    // used to generate sequential ids
-    private long nextGraphId = 0L;
-    private long nextVertexId = 0L;
-    private long nextEdgeId = 0L;
+  // used to generate ids
+  private final Function<Optional<String>, Long> nextGraphId;
+  private final Function<Optional<String>, Long> nextVertexId;
+  private final Function<Optional<String>, Long> nextEdgeId;
 
     // flag that tells if the parser is inside a logical graph
     private boolean inGraph = false;
@@ -89,35 +95,34 @@ class GDLLoader extends GDLBaseListener {
     private static final String ANONYMOUS_VERTEX_VARIABLE = "__v%d";
     private static final String ANONYMOUS_EDGE_VARIABLE = "__e%d";
 
-    /**
-     * Processes the temporal parts of the query
-     */
-    private final GDLLoaderTemporal temporalLoader;
+  /**
+   * Initializes a new GDL Loader.
+   *
+   * @param defaultGraphLabel   graph label to be used if no label is given in the GDL script
+   * @param defaultVertexLabel  vertex label to be used if no label is given in the GDL script
+   * @param defaultEdgeLabel    edge label to be used if no label is given in the GDL script
+   */
+  GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel) {
+    this(
+            defaultGraphLabel, defaultVertexLabel, defaultEdgeLabel,
+            true, true, true,
+            new ContinuousId(), new ContinuousId(), new ContinuousId()
+    );
+  }
 
-    /**
-     * Initializes a new GDL Loader.
-     *
-     * @param defaultGraphLabel  graph label to be used if no label is given in the GDL script
-     * @param defaultVertexLabel vertex label to be used if no label is given in the GDL script
-     * @param defaultEdgeLabel   edge label to be used if no label is given in the GDL script
-     */
-    GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel) {
-        this(defaultGraphLabel, defaultVertexLabel, defaultEdgeLabel,
-                true, true, true);
-    }
-
-    /**
-     * Initializes a new GDL Loader.
-     *
-     * @param defaultGraphLabel     graph label to be used if no label is given in the GDL script
-     * @param defaultVertexLabel    vertex label to be used if no label is given in the GDL script
-     * @param defaultEdgeLabel      edge label to be used if no label is given in the GDL script
-     * @param useDefaultGraphLabel  enable default graph label
-     * @param useDefaultVertexLabel enable default vertex label
-     * @param useDefaultEdgeLabel   enable default edge label
-     */
-    GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel,
-              boolean useDefaultGraphLabel, boolean useDefaultVertexLabel, boolean useDefaultEdgeLabel) {
+  /**
+   * Initializes a new GDL Loader.
+   *
+   * @param defaultGraphLabel     graph label to be used if no label is given in the GDL script
+   * @param defaultVertexLabel    vertex label to be used if no label is given in the GDL script
+   * @param defaultEdgeLabel      edge label to be used if no label is given in the GDL script
+   * @param useDefaultGraphLabel  enable default graph label
+   * @param useDefaultVertexLabel enable default vertex label
+   * @param useDefaultEdgeLabel   enable default edge label
+   */
+  GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel,
+            boolean useDefaultGraphLabel, boolean useDefaultVertexLabel, boolean useDefaultEdgeLabel,
+            Function<Optional<String>, Long> nextGraphId, Function<Optional<String>, Long> nextVertexId, Function<Optional<String>, Long> nextEdgeId) {
 
         this.useDefaultGraphLabel = useDefaultGraphLabel;
         this.useDefaultVertexLabel = useDefaultVertexLabel;
@@ -126,6 +131,10 @@ class GDLLoader extends GDLBaseListener {
         this.defaultGraphLabel = defaultGraphLabel;
         this.defaultVertexLabel = defaultVertexLabel;
         this.defaultEdgeLabel = defaultEdgeLabel;
+
+        this.nextGraphId = nextGraphId;
+        this.nextVertexId = nextVertexId;
+        this.nextEdgeId = nextEdgeId;
 
         userGraphCache = new HashMap<>();
         userVertexCache = new HashMap<>();
@@ -273,35 +282,43 @@ class GDLLoader extends GDLBaseListener {
         return getCache(userEdgeCache, autoEdgeCache, includeUserDefined, includeAutoGenerated);
     }
 
-    /**
-     * Called when parser enters a graph context.
-     * <p>
-     * Checks if the graph has already been created (using its variable). If not, a new graph is
-     * created and added to the graph cache.
-     *
-     * @param graphContext graph context
-     */
-    @Override
-    public void enterGraph(GDLParser.GraphContext graphContext) {
-        inGraph = true;
-        String variable = getVariable(graphContext.header());
-        Graph g;
-        if (variable != null && userGraphCache.containsKey(variable)) {
-            g = userGraphCache.get(variable);
-        } else {
-            g = initNewGraph(graphContext);
+  private boolean isEmpty(List<GDLParser.LabelContext> label, GDLParser.PropertiesContext properties) {
+    return (label == null || label.isEmpty()) && (properties == null || properties.property().isEmpty());
+  }
 
-            if (variable != null) {
-                userGraphCache.put(variable, g);
-            } else {
-                variable = String.format(ANONYMOUS_GRAPH_VARIABLE, g.getId());
-                autoGraphCache.put(variable, g);
-            }
-            g.setVariable(variable);
-            graphs.add(g);
-        }
-        currentGraphId = g.getId();
+
+  /**
+   * Called when parser enters a graph context.
+   *
+   * Checks if the graph has already been created (using its variable). If not, a new graph is
+   * created and added to the graph cache.
+   *
+   * @param graphContext graph context
+   */
+  @Override
+  public void enterGraph(GDLParser.GraphContext graphContext) {
+    inGraph = true;
+    String variable = getVariable(graphContext.header());
+    Graph g;
+    if (variable != null && userGraphCache.containsKey(variable)) {
+      g = userGraphCache.get(variable);
+      if(!isEmpty(graphContext.header().label(), graphContext.properties())) {
+        throw new DuplicateDeclarationException(g);
+      }
+    } else {
+      g = initNewGraph(graphContext, variable);
+
+      if (variable != null) {
+        userGraphCache.put(variable, g);
+      } else {
+        variable = String.format(ANONYMOUS_GRAPH_VARIABLE, g.getId());
+        autoGraphCache.put(variable, g);
+      }
+      g.setVariable(variable);
+      graphs.add(g);
     }
+    currentGraphId = g.getId();
+  }
 
     @Override
     public void exitGraph(GDLParser.GraphContext ctx) {
@@ -332,22 +349,25 @@ class GDLLoader extends GDLBaseListener {
         }
     }
 
-    /**
-     * Called when parser enters a vertex context.
-     * <p>
-     * Checks if the vertex has already been created (using its variable). If not, a new vertex is
-     * created and added to the vertex cache.
-     *
-     * @param vertexContext vertex context
-     */
-    @Override
-    public void enterVertex(GDLParser.VertexContext vertexContext) {
-        String variable = getVariable(vertexContext.header());
-        Vertex v;
-        if (variable != null && userVertexCache.containsKey(variable)) {
-            v = userVertexCache.get(variable);
-        } else {
-            v = initNewVertex(vertexContext);
+  /**
+   * Called when parser enters a vertex context.
+   *
+   * Checks if the vertex has already been created (using its variable). If not, a new vertex is
+   * created and added to the vertex cache.
+   *
+   * @param vertexContext vertex context
+   */
+  @Override
+  public void enterVertex(GDLParser.VertexContext vertexContext) {
+    String variable = getVariable(vertexContext.header());
+    Vertex v;
+    if (variable != null && userVertexCache.containsKey(variable)) {
+      v = userVertexCache.get(variable);
+      if (!isEmpty(vertexContext.header().label(), vertexContext.properties())) {
+        throw new DuplicateDeclarationException(v);
+      };
+    } else {
+      v = initNewVertex(vertexContext, Optional.ofNullable(variable));
 
             if (variable != null) {
                 userVertexCache.put(variable, v);
@@ -507,13 +527,16 @@ class GDLLoader extends GDLBaseListener {
         String variable = null;
         Edge e;
 
-        if (edgeBodyContext != null) {
-            variable = getVariable(edgeBodyContext.header());
-        }
-        if (variable != null && userEdgeCache.containsKey(variable)) {
-            e = userEdgeCache.get(variable);
-        } else {
-            e = initNewEdge(edgeBodyContext, isIncoming);
+    if (edgeBodyContext != null) {
+      variable = getVariable(edgeBodyContext.header());
+    }
+    if (variable != null && userEdgeCache.containsKey(variable)) {
+      e = userEdgeCache.get(variable);
+      if (!isEmpty(edgeBodyContext.header().label(), edgeBodyContext.properties())) {
+        throw new DuplicateDeclarationException(e);
+      };
+    } else {
+      e = initNewEdge(edgeBodyContext, isIncoming, Optional.ofNullable(variable));
 
             if (variable != null) {
                 userEdgeCache.put(variable, e);
@@ -559,94 +582,91 @@ class GDLLoader extends GDLBaseListener {
     //  Init handlers
     // --------------------------------------------------------------------------------------------
 
-    /**
-     * Initializes a new graph from a given graph context.
-     *
-     * @param graphContext graph context
-     * @return new graph
-     */
-    private Graph initNewGraph(GDLParser.GraphContext graphContext) {
-        Graph g = new Graph();
-        g.setId(getNewGraphId());
-        List<String> labels = getLabels(graphContext.header());
-        g.setLabels(labels.isEmpty() ?
-                useDefaultGraphLabel ? Collections.singletonList(defaultGraphLabel) : Collections.emptyList()
-                : labels);
-        g.setProperties(getProperties(graphContext.properties()));
+  /**
+   * Initializes a new graph from a given graph context.
+   *
+   * @param graphContext graph context
+   * @param variable the variable to identify the graph
+   * @return new graph
+   */
+  private Graph initNewGraph(GDLParser.GraphContext graphContext, String variable) {
+    Graph g = new Graph();
+    g.setId(getNewGraphId(Optional.ofNullable(variable)));
+    List<String> labels = getLabels(graphContext.header());
+    g.setLabels(labels.isEmpty() ?
+      useDefaultGraphLabel ? Collections.singletonList(defaultGraphLabel) : Collections.emptyList()
+      : labels);
+    g.setProperties(getProperties(graphContext.properties()));
 
         return g;
     }
 
-    /**
-     * Initializes a new vertex from a given vertex context.
-     *
-     * @param vertexContext vertex context
-     * @return new vertex
-     */
-    private Vertex initNewVertex(GDLParser.VertexContext vertexContext) {
-        Vertex v = new Vertex();
-        v.setId(getNewVertexId());
-        List<String> labels = getLabels(vertexContext.header());
-        v.setLabels(labels.isEmpty() ?
-                useDefaultVertexLabel ? Collections.singletonList(defaultVertexLabel) : Collections.emptyList()
-                : labels);
-        v.setProperties(getProperties(vertexContext.properties()));
+  /**
+   * Initializes a new vertex from a given vertex context.
+   *
+   * @param vertexContext vertex context
+   * @return new vertex
+   */
+  private Vertex initNewVertex(GDLParser.VertexContext vertexContext, Optional<String> variable) {
+    Vertex v = new Vertex();
+    v.setId(getNewVertexId(variable));
+    List<String> labels = getLabels(vertexContext.header());
+    v.setLabels(labels.isEmpty() ?
+      useDefaultVertexLabel ? Collections.singletonList(defaultVertexLabel) : Collections.emptyList()
+      : labels);
+    v.setProperties(getProperties(vertexContext.properties()));
 
-        return v;
+    return v;
+  }
+
+  /**
+   * Initializes a new edge from the given edge body context.
+   *
+   * @param edgeBodyContext edge body context
+   * @param isIncoming      true, if it's an incoming edge, false for outgoing edge
+   * @return new edge
+   */
+  private Edge initNewEdge(GDLParser.EdgeBodyContext edgeBodyContext, boolean isIncoming, Optional<String> variable) {
+    boolean hasBody = edgeBodyContext != null;
+    Edge e = new Edge();
+    e.setId(getNewEdgeId(variable));
+    e.setSourceVertexId(getSourceVertexId(isIncoming));
+    e.setTargetVertexId(getTargetVertexId(isIncoming));
+
+    if (hasBody) {
+      List<String> labels = getLabels(edgeBodyContext.header());
+      e.setLabels(labels.isEmpty() ?
+        useDefaultEdgeLabel ? Collections.singletonList(defaultEdgeLabel) : Collections.emptyList()
+        : labels);
+      e.setProperties(getProperties(edgeBodyContext.properties()));
+      int[] range = parseEdgeLengthContext(edgeBodyContext.edgeLength());
+      e.setLowerBound(range[0]);
+      e.setUpperBound(range[1]);
+    } else {
+      if (useDefaultEdgeLabel) {
+        e.setLabel(defaultEdgeLabel);
+      } else {
+        e.setLabel(null);
+      }
     }
 
-    /**
-     * Initializes a new edge from the given edge body context.
-     *
-     * @param edgeBodyContext edge body context
-     * @param isIncoming      true, if it's an incoming edge, false for outgoing edge
-     * @return new edge
-     */
-    private Edge initNewEdge(GDLParser.EdgeBodyContext edgeBodyContext, boolean isIncoming) {
-        boolean hasBody = edgeBodyContext != null;
-        Edge e = new Edge();
-        e.setId(getNewEdgeId());
-        e.setSourceVertexId(getSourceVertexId(isIncoming));
-        e.setTargetVertexId(getTargetVertexId(isIncoming));
+    return e;
+  }
 
-        if (hasBody) {
-            List<String> labels = getLabels(edgeBodyContext.header());
-            e.setLabels(labels.isEmpty() ?
-                    useDefaultEdgeLabel ? Collections.singletonList(defaultEdgeLabel) : Collections.emptyList()
-                    : labels);
-            e.setProperties(getProperties(edgeBodyContext.properties()));
-            int[] range = parseEdgeLengthContext(edgeBodyContext.edgeLength());
-            e.setLowerBound(range[0]);
-            e.setUpperBound(range[1]);
-        } else {
-            if (useDefaultEdgeLabel) {
-                e.setLabel(defaultEdgeLabel);
-            } else {
-                e.setLabel(null);
-            }
-        }
+  // --------------------------------------------------------------------------------------------
+  //  Update handlers
+  // --------------------------------------------------------------------------------------------
 
-        return e;
+  /**
+   * If the parser is currently inside a logical graph, the given element is added to that graph.
+   *
+   * @param graphElement graph element ({@link Vertex}, {@link Edge})
+   */
+  private void updateGraphElement(GraphElement graphElement) {
+    if (inGraph) {
+      graphElement.addToGraph(getNextGraphId());
     }
-
-    // --------------------------------------------------------------------------------------------
-    //  Update handlers
-    // --------------------------------------------------------------------------------------------
-
-    /**
-     * If the parser is currently inside a logical graph, the given element is added to that graph.
-     *
-     * @param graphElement graph element ({@link Vertex}, {@link Edge})
-     */
-    private void updateGraphElement(GraphElement graphElement) {
-        if (inGraph) {
-            graphElement.addToGraph(getNextGraphId());
-            if (!graphElements.containsKey(getNextGraphId())) {
-                graphElements.put(getNextGraphId(), new ArrayList<>());
-            }
-            graphElements.get(getNextGraphId()).add(graphElement);
-        }
-    }
+  }
 
     // --------------------------------------------------------------------------------------------
     //  Payload handlers
@@ -683,22 +703,30 @@ class GDLLoader extends GDLBaseListener {
         return null;
     }
 
-    /**
-     * Returns the properties map from a given properties context.
-     *
-     * @param propertiesContext properties context
-     * @return properties map or {@code null} if context was null
-     */
-    private Map<String, Object> getProperties(GDLParser.PropertiesContext propertiesContext) {
-        if (propertiesContext != null) {
-            Map<String, Object> properties = new HashMap<>();
-            for (GDLParser.PropertyContext property : propertiesContext.property()) {
-                properties.put(property.Identifier().getText(), getPropertyValue(property.literal()));
-            }
-            return properties;
+  /**
+   * Returns the properties map from a given properties context.
+   *
+   * @param propertiesContext properties context
+   * @return properties map or {@code null} if context was null
+   */
+  private Map<String, Object> getProperties(GDLParser.PropertiesContext propertiesContext) {
+    if (propertiesContext != null) {
+      Map<String, Object> properties = new HashMap<>();
+      for (GDLParser.PropertyContext property : propertiesContext.property()) {
+        if (property.listLiteral() != null) {
+          List<Object> list = property.listLiteral().literalList().literal()
+                  .stream()
+                  .map(this::getPropertyValue)
+                  .collect(Collectors.toList());
+          properties.put(property.Identifier().getText(), list);
+        } else {
+          properties.put(property.Identifier().getText(), getPropertyValue(property.literal()));
         }
-        return Collections.emptyMap();
+      }
+      return properties;
     }
+    return Collections.emptyMap();
+  }
 
     /**
      * Returns the corresponding value for a given literal.
@@ -836,32 +864,35 @@ class GDLLoader extends GDLBaseListener {
         return currentGraphId;
     }
 
-    /**
-     * Creates and returns an new graph identifier.
-     *
-     * @return new graph identifier
-     */
-    private Long getNewGraphId() {
-        return nextGraphId++;
-    }
+  /**
+   * Creates and returns an new graph identifier.
+   *
+   * @return new graph identifier
+   * @param variable GDL graph variable or none if anonymous
+   */
+  private Long getNewGraphId(Optional<String> variable) {
+    return nextGraphId.apply(variable);
+  }
 
-    /**
-     * Creates and returns a new vertex identifier.
-     *
-     * @return new vertex identifier
-     */
-    private Long getNewVertexId() {
-        return nextVertexId++;
-    }
+  /**
+   * Creates and returns a new vertex identifier.
+   *
+   * @return new vertex identifier
+   * @param variable GDL vertex variable or none if anonymous
+   */
+  private Long getNewVertexId(Optional<String> variable) {
+    return nextVertexId.apply(variable);
+  }
 
-    /**
-     * Creates and returns a new edge identifier.
-     *
-     * @return new edge identifier
-     */
-    private Long getNewEdgeId() {
-        return nextEdgeId++;
-    }
+  /**
+   * Creates and returns a new edge identifier.
+   *
+   * @return new edge identifier
+   * @param variable GDL edge variable or none if anonymous
+   */
+  private Long getNewEdgeId(Optional<String> variable) {
+    return nextEdgeId.apply(variable);
+  }
 
     // --------------------------------------------------------------------------------------------
     //  Helper

@@ -6,8 +6,6 @@
     <artifactId>gdl</artifactId>
     <version>0.4.0-SNAPSHOT</version>
 
-
-
     <name>GDL - Graph Definition Language</name>
     <description>ANTLR Grammar for the definition of extended property graphs.</description>
     <url>http://github.com/s1ck/gdl.git</url>
@@ -24,8 +22,6 @@
         <developer>
             <name>Martin Junghanns</name>
             <email>m.junghanns@mailbox.org</email>
-            <organization>Leipzig University</organization>
-            <organizationUrl>http://dbs.uni-leipzig.de/</organizationUrl>
             <id>s1ck</id>
         </developer>
     </developers>
@@ -48,17 +44,17 @@
     </distributionManagement>
 
     <properties>
-        <project.build.targetJdk>1.8</project.build.targetJdk>
+        <project.build.targetJdk>11</project.build.targetJdk>
 
-        <dep.antlr.version>4.5</dep.antlr.version>
-        <dep.junit.version>4.12</dep.junit.version>
+        <dep.antlr.version>4.9.1</dep.antlr.version>
+        <dep.junit.version>4.13.1</dep.junit.version>
 
-        <plugin.maven-compiler.version>3.0</plugin.maven-compiler.version>
+        <plugin.maven-compiler.version>3.8.0</plugin.maven-compiler.version>
         <plugin.maven-release.version>2.5.3</plugin.maven-release.version>
-        <plugin.maven-source.version>3.0.1</plugin.maven-source.version>
-        <plugin.maven-javadoc.version>2.9.1</plugin.maven-javadoc.version>
+        <plugin.maven-source.version>3.2.1</plugin.maven-source.version>
+        <plugin.maven-javadoc.version>3.2.0</plugin.maven-javadoc.version>
         <plugin.maven-gpg.version>1.6</plugin.maven-gpg.version>
-        <plugin.maven-nexus-staging.version>1.6.7</plugin.maven-nexus-staging.version>
+        <plugin.maven-nexus-staging.version>1.6.8</plugin.maven-nexus-staging.version>
     </properties>
 
     <dependencies>
@@ -145,6 +141,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <version>${plugin.maven-gpg.version}</version>
+                <configuration>
+                    <gpgArguments>
+                        <arg>--pinentry-mode</arg>
+                        <arg>loopback</arg>
+                    </gpgArguments>
+                </configuration>
                 <executions>
                     <execution>
                         <id>sign_artifacts</id>
@@ -163,7 +165,7 @@
                 <configuration>
                     <serverId>release_artifacts</serverId>
                     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
         </plugins>
