@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.s1ck.gdl;
 
 import org.antlr.v4.runtime.RuleContext;
@@ -29,6 +28,8 @@ import org.s1ck.gdl.model.comparables.ElementSelector;
 import org.s1ck.gdl.model.comparables.Literal;
 import org.s1ck.gdl.model.comparables.PropertySelector;
 import org.s1ck.gdl.model.predicates.Predicate;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
+import org.s1ck.gdl.model.comparables.time.TimeLiteral;
 import org.s1ck.gdl.model.predicates.booleans.And;
 import org.s1ck.gdl.model.predicates.booleans.Not;
 import org.s1ck.gdl.model.predicates.booleans.Or;
@@ -47,6 +48,9 @@ class GDLLoader extends GDLBaseListener {
   private final Map<String, Graph> userGraphCache;
   private final Map<String, Vertex> userVertexCache;
   private final Map<String, Edge> userEdgeCache;
+
+  // used to map graphs to their elements
+  private final Map<Long, ArrayList<GraphElement>> graphElements;
 
   // used to cache elements which are assigned to auto-generated variables
   private final Map<String, Graph> autoGraphCache;
@@ -84,7 +88,7 @@ class GDLLoader extends GDLBaseListener {
   private Edge lastSeenEdge;
 
   // used to keep track of filter that are yet to be handled
-  private Deque<Predicate> currentPredicates;
+  private final Deque<Predicate> currentPredicates;
 
   // used to generate variable names if none is given
   private static final String ANONYMOUS_GRAPH_VARIABLE = "__g%d";
@@ -92,18 +96,20 @@ class GDLLoader extends GDLBaseListener {
   private static final String ANONYMOUS_EDGE_VARIABLE = "__e%d";
 
   /**
+   * Processes the temporal parts of the query
+   */
+  private final GDLLoaderTemporal temporalLoader;
+
+  /**
    * Initializes a new GDL Loader.
    *
-   * @param defaultGraphLabel   graph label to be used if no label is given in the GDL script
-   * @param defaultVertexLabel  vertex label to be used if no label is given in the GDL script
-   * @param defaultEdgeLabel    edge label to be used if no label is given in the GDL script
+   * @param defaultGraphLabel  graph label to be used if no label is given in the GDL script
+   * @param defaultVertexLabel vertex label to be used if no label is given in the GDL script
+   * @param defaultEdgeLabel   edge label to be used if no label is given in the GDL script
    */
   GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel) {
-    this(
-            defaultGraphLabel, defaultVertexLabel, defaultEdgeLabel,
-            true, true, true,
-            new ContinuousId(), new ContinuousId(), new ContinuousId()
-    );
+    this(defaultGraphLabel, defaultVertexLabel, defaultEdgeLabel, true, true, true, new ContinuousId(),
+      new ContinuousId(), new ContinuousId());
   }
 
   /**
@@ -117,35 +123,41 @@ class GDLLoader extends GDLBaseListener {
    * @param useDefaultEdgeLabel   enable default edge label
    */
   GDLLoader(String defaultGraphLabel, String defaultVertexLabel, String defaultEdgeLabel,
-            boolean useDefaultGraphLabel, boolean useDefaultVertexLabel, boolean useDefaultEdgeLabel,
-            Function<Optional<String>, Long> nextGraphId, Function<Optional<String>, Long> nextVertexId, Function<Optional<String>, Long> nextEdgeId) {
+    boolean useDefaultGraphLabel, boolean useDefaultVertexLabel, boolean useDefaultEdgeLabel,
+    Function<Optional<String>, Long> nextGraphId, Function<Optional<String>, Long> nextVertexId,
+    Function<Optional<String>, Long> nextEdgeId) {
 
     this.useDefaultGraphLabel = useDefaultGraphLabel;
     this.useDefaultVertexLabel = useDefaultVertexLabel;
     this.useDefaultEdgeLabel = useDefaultEdgeLabel;
 
-    this.defaultGraphLabel  = defaultGraphLabel;
+    this.defaultGraphLabel = defaultGraphLabel;
     this.defaultVertexLabel = defaultVertexLabel;
-    this.defaultEdgeLabel   = defaultEdgeLabel;
+    this.defaultEdgeLabel = defaultEdgeLabel;
 
     this.nextGraphId = nextGraphId;
     this.nextVertexId = nextVertexId;
     this.nextEdgeId = nextEdgeId;
 
-    userGraphCache = new HashMap<>();
-    userVertexCache = new HashMap<>();
-    userEdgeCache = new HashMap<>();
+    this.userGraphCache = new HashMap<>();
+    this.userVertexCache = new HashMap<>();
+    this.userEdgeCache = new HashMap<>();
 
-    autoGraphCache = new HashMap<>();
-    autoVertexCache = new HashMap<>();
-    autoEdgeCache = new HashMap<>();
+    this.graphElements = new HashMap<>();
 
-    graphs    = new HashSet<>();
-    vertices  = new HashSet<>();
-    edges     = new HashSet<>();
+    this.autoGraphCache = new HashMap<>();
+    this.autoVertexCache = new HashMap<>();
+    this.autoEdgeCache = new HashMap<>();
 
-    currentPredicates = new ArrayDeque<>();
+    this.graphs = new HashSet<>();
+    this.vertices = new HashSet<>();
+    this.edges = new HashSet<>();
+
+    this.currentPredicates = new ArrayDeque<>();
+
+    this.temporalLoader = new GDLLoaderTemporal(this);
   }
+
 
   /**
    * Returns the default graph label.
@@ -201,14 +213,15 @@ class GDLLoader extends GDLBaseListener {
     return edges;
   }
 
-    /**
-     * Returns the predicates defined by the query.
-     *
-     * @return predicates
-     */
+  /**
+   * Returns the predicates defined by the query.
+   *
+   * @return predicates
+   */
   Optional<Predicate> getPredicates() {
     return predicates != null ? Optional.of(predicates) : Optional.empty();
   }
+
   /**
    * Returns a cache that contains a mapping from user-defined variables used in the GDL script to
    * graph instances.
@@ -222,9 +235,8 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Returns a cache containing a mapping from variables to graphs.
    *
-   * @param includeUserDefined include user-defined variables
+   * @param includeUserDefined   include user-defined variables
    * @param includeAutoGenerated include auto-generated variables
-   *
    * @return immutable graph cache
    */
   Map<String, Graph> getGraphCache(boolean includeUserDefined, boolean includeAutoGenerated) {
@@ -244,9 +256,8 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Returns a cache containing a mapping from variables to vertices.
    *
-   * @param includeUserDefined include user-defined variables
+   * @param includeUserDefined   include user-defined variables
    * @param includeAutoGenerated include auto-generated variables
-   *
    * @return immutable vertex cache
    */
   Map<String, Vertex> getVertexCache(boolean includeUserDefined, boolean includeAutoGenerated) {
@@ -266,15 +277,21 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Returns a cache containing a mapping from variables to edges.
    *
-   * @param includeUserDefined include user-defined variables
+   * @param includeUserDefined   include user-defined variables
    * @param includeAutoGenerated include auto-generated variables
-   *
    * @return immutable edge cache
    */
   Map<String, Edge> getEdgeCache(boolean includeUserDefined, boolean includeAutoGenerated) {
     return getCache(userEdgeCache, autoEdgeCache, includeUserDefined, includeAutoGenerated);
   }
 
+  /**
+   * Check if label and properties are empty.
+   *
+   * @param label the list of label to check
+   * @param properties the properties to check
+   * @return true iff the label list or the properties are null or empty
+   */
   private boolean isEmpty(List<GDLParser.LabelContext> label, GDLParser.PropertiesContext properties) {
     return (label == null || label.isEmpty()) && (properties == null || properties.property().isEmpty());
   }
@@ -282,7 +299,7 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Called when parser enters a graph context.
-   *
+   * <p>
    * Checks if the graph has already been created (using its variable). If not, a new graph is
    * created and added to the graph cache.
    *
@@ -295,7 +312,7 @@ class GDLLoader extends GDLBaseListener {
     Graph g;
     if (variable != null && userGraphCache.containsKey(variable)) {
       g = userGraphCache.get(variable);
-      if(!isEmpty(graphContext.header().label(), graphContext.properties())) {
+      if (!isEmpty(graphContext.header().label(), graphContext.properties())) {
         throw new DuplicateDeclarationException(g);
       }
     } else {
@@ -325,17 +342,26 @@ class GDLLoader extends GDLBaseListener {
    */
   @Override
   public void exitQuery(GDLParser.QueryContext ctx) {
-    for(Vertex v : vertices) {
+    ArrayList<String> vars = new ArrayList<>();
+    vars.addAll(userEdgeCache.keySet());
+    vars.addAll(userVertexCache.keySet());
+    vars.addAll(autoEdgeCache.keySet());
+    vars.addAll(autoVertexCache.keySet());
+    vars.remove(TimeSelector.GLOBAL_SELECTOR);
+    if (predicates != null) {
+      predicates = predicates.replaceGlobalByLocal(vars);
+    }
+    for (Vertex v : vertices) {
       addPredicates(Predicate.fromGraphElement(v, getDefaultVertexLabel()));
     }
-    for(Edge e : edges) {
+    for (Edge e : edges) {
       addPredicates(Predicate.fromGraphElement(e, getDefaultEdgeLabel()));
     }
   }
 
   /**
    * Called when parser enters a vertex context.
-   *
+   * <p>
    * Checks if the vertex has already been created (using its variable). If not, a new vertex is
    * created and added to the vertex cache.
    *
@@ -349,7 +375,8 @@ class GDLLoader extends GDLBaseListener {
       v = userVertexCache.get(variable);
       if (!isEmpty(vertexContext.header().label(), vertexContext.properties())) {
         throw new DuplicateDeclarationException(v);
-      };
+      }
+      ;
     } else {
       v = initNewVertex(vertexContext, Optional.ofNullable(variable));
 
@@ -389,15 +416,17 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Called when the parser leaves a WHERE expression
-   *
+   * <p>
    * Takes care that the filter build from the current expression is stored
-   * in the graph
+   * in the graph and that default asOf(now) predicates are added iff there are no constraints
+   * on any tx_to values
    *
    * @param ctx where context
    */
   @Override
   public void exitWhere(GDLParser.WhereContext ctx) {
-    addPredicates(Collections.singletonList(currentPredicates.pop()));
+    Predicate predicate = currentPredicates.pop();
+    addPredicates(Collections.singletonList(predicate));
   }
 
   /**
@@ -410,10 +439,47 @@ class GDLLoader extends GDLBaseListener {
     currentPredicates.add(buildComparison(ctx));
   }
 
+  @Override
+  public void enterTemporalComparison(GDLParser.TemporalComparisonContext ctx) {
+    currentPredicates.add(temporalLoader.buildTemporalComparison(ctx));
+  }
+
+  /**
+   * Builds a {@code Predicate} from the given interval function (caller is a interval)
+   * interval functions are e.g. succeeds(x), between(x,y)....
+   *
+   * @param ctx interval function context
+   */
+  @Override
+  public void enterIntvF(GDLParser.IntvFContext ctx) {
+    currentPredicates.add(temporalLoader.buildIntervalFunction(ctx));
+  }
+
+  /**
+   * Builds a {@code Predicate} from the given TimeStamp-Function (caller is a timestamp)
+   * time stamp functions are e.g. succeeds(x), before(x),...
+   *
+   * @param ctx stamp function context
+   */
+  @Override
+  public void enterStmpF(GDLParser.StmpFContext ctx) {
+    currentPredicates.add(temporalLoader.buildStampFunction(ctx));
+  }
+
+  /**
+   * Returns the literal for all "Now" literals in the query
+   *
+   * @return literal for all "Now" literals in the query
+   */
+  public TimeLiteral getNowLit() {
+    return temporalLoader.getNowLit();
+  }
+
   /**
    * Called when we leave an NotExpression.
-   *
+   * <p>
    * Checks if the expression is preceded by a Not and adds the filter in that case.
+   *
    * @param ctx expression context
    */
   @Override
@@ -426,8 +492,9 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Called when parser leaves AndExpression
-   *
+   * <p>
    * Processes expressions connected by AND
+   *
    * @param ctx expression context
    */
   @Override
@@ -437,8 +504,9 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Called when parser leaves OrExpression
-   *
+   * <p>
    * Processes expressions connected by OR
+   *
    * @param ctx expression context
    */
   @Override
@@ -448,8 +516,9 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Called when parser leaves AXorExpression
-   *
+   * <p>
    * Processes expressions connected by XOR
+   *
    * @param ctx expression context
    */
   @Override
@@ -459,7 +528,7 @@ class GDLLoader extends GDLBaseListener {
 
   /**
    * Processes incoming and outgoing edges.
-   *
+   * <p>
    * Checks if the edge has already been created (using its variable). If not, a new edge is created
    * and added to the edge cache.
    *
@@ -477,7 +546,7 @@ class GDLLoader extends GDLBaseListener {
       e = userEdgeCache.get(variable);
       if (!isEmpty(edgeBodyContext.header().label(), edgeBodyContext.properties())) {
         throw new DuplicateDeclarationException(e);
-      };
+      }
     } else {
       e = initNewEdge(edgeBodyContext, isIncoming, Optional.ofNullable(variable));
 
@@ -495,27 +564,27 @@ class GDLLoader extends GDLBaseListener {
   }
 
   /**
-   * Processes a conjuctive expression (AND, OR, XOR) and connects the filter with the corresponding operator
+   * Processes a conjunctive expression (AND, OR, XOR) and connects the filter with the corresponding
+   * operator
    *
    * @param conjunctions list of conjunction operators
    */
   private void processConjunctionExpression(List<TerminalNode> conjunctions) {
     Predicate conjunctionReuse;
-
     for (int i = conjunctions.size() - 1; i >= 0; i--) {
       Predicate rhs = currentPredicates.removeLast();
       Predicate lhs = currentPredicates.removeLast();
 
       switch (conjunctions.get(i).getText().toLowerCase()) {
-        case "and":
-          conjunctionReuse = new And(lhs, rhs);
-          break;
-        case "or":
-          conjunctionReuse = new Or(lhs, rhs);
-          break;
-        default:
-          conjunctionReuse = new Xor(lhs, rhs);
-          break;
+      case "and":
+        conjunctionReuse = new And(lhs, rhs);
+        break;
+      case "or":
+        conjunctionReuse = new Or(lhs, rhs);
+        break;
+      default:
+        conjunctionReuse = new Xor(lhs, rhs);
+        break;
       }
       currentPredicates.add(conjunctionReuse);
     }
@@ -529,7 +598,7 @@ class GDLLoader extends GDLBaseListener {
    * Initializes a new graph from a given graph context.
    *
    * @param graphContext graph context
-   * @param variable the variable to identify the graph
+   * @param variable     the variable to identify the graph
    * @return new graph
    */
   private Graph initNewGraph(GDLParser.GraphContext graphContext, String variable) {
@@ -537,8 +606,7 @@ class GDLLoader extends GDLBaseListener {
     g.setId(getNewGraphId(Optional.ofNullable(variable)));
     List<String> labels = getLabels(graphContext.header());
     g.setLabels(labels.isEmpty() ?
-      useDefaultGraphLabel ? Collections.singletonList(defaultGraphLabel) : Collections.emptyList()
-      : labels);
+      useDefaultGraphLabel ? Collections.singletonList(defaultGraphLabel) : Collections.emptyList() : labels);
     g.setProperties(getProperties(graphContext.properties()));
 
     return g;
@@ -555,8 +623,8 @@ class GDLLoader extends GDLBaseListener {
     v.setId(getNewVertexId(variable));
     List<String> labels = getLabels(vertexContext.header());
     v.setLabels(labels.isEmpty() ?
-      useDefaultVertexLabel ? Collections.singletonList(defaultVertexLabel) : Collections.emptyList()
-      : labels);
+      useDefaultVertexLabel ? Collections.singletonList(defaultVertexLabel) : Collections.emptyList() :
+      labels);
     v.setProperties(getProperties(vertexContext.properties()));
 
     return v;
@@ -569,7 +637,9 @@ class GDLLoader extends GDLBaseListener {
    * @param isIncoming      true, if it's an incoming edge, false for outgoing edge
    * @return new edge
    */
-  private Edge initNewEdge(GDLParser.EdgeBodyContext edgeBodyContext, boolean isIncoming, Optional<String> variable) {
+  private Edge initNewEdge(GDLParser.EdgeBodyContext edgeBodyContext, boolean isIncoming,
+    Optional<String> variable) {
+
     boolean hasBody = edgeBodyContext != null;
     Edge e = new Edge();
     e.setId(getNewEdgeId(variable));
@@ -579,8 +649,7 @@ class GDLLoader extends GDLBaseListener {
     if (hasBody) {
       List<String> labels = getLabels(edgeBodyContext.header());
       e.setLabels(labels.isEmpty() ?
-        useDefaultEdgeLabel ? Collections.singletonList(defaultEdgeLabel) : Collections.emptyList()
-        : labels);
+        useDefaultEdgeLabel ? Collections.singletonList(defaultEdgeLabel) : Collections.emptyList() : labels);
       e.setProperties(getProperties(edgeBodyContext.properties()));
       int[] range = parseEdgeLengthContext(edgeBodyContext.edgeLength());
       e.setLowerBound(range[0]);
@@ -636,11 +705,7 @@ class GDLLoader extends GDLBaseListener {
    */
   private List<String> getLabels(GDLParser.HeaderContext header) {
     if (header != null && header.label() != null) {
-      return header
-        .label()
-        .stream()
-        .map(RuleContext::getText)
-        .map(x -> x.substring(1))
+      return header.label().stream().map(RuleContext::getText).map(x -> x.substring(1))
         .collect(Collectors.toList());
     }
     return null;
@@ -657,10 +722,9 @@ class GDLLoader extends GDLBaseListener {
       Map<String, Object> properties = new HashMap<>();
       for (GDLParser.PropertyContext property : propertiesContext.property()) {
         if (property.listLiteral() != null) {
-          List<Object> list = property.listLiteral().literalList().literal()
-                  .stream()
-                  .map(this::getPropertyValue)
-                  .collect(Collectors.toList());
+          List<Object> list =
+            property.listLiteral().literalList().literal().stream().map(this::getPropertyValue)
+              .collect(Collectors.toList());
           properties.put(property.Identifier().getText(), list);
         } else {
           properties.put(property.Identifier().getText(), getPropertyValue(property.literal()));
@@ -713,7 +777,7 @@ class GDLLoader extends GDLBaseListener {
     int lowerBound = 0;
     int upperBound = 0;
 
-    if(lengthCtx != null) {
+    if (lengthCtx != null) {
       int children = lengthCtx.getChildCount();
 
       if (children == 4) { // [*1..2]
@@ -724,16 +788,14 @@ class GDLLoader extends GDLBaseListener {
 
       } else if (children == 2) { // [*1]
         lowerBound = terminalNodeToInt(lengthCtx.IntegerLiteral(0));
-      } else { // [*]
-        lowerBound = 0;
-        upperBound = 0;
       }
+      // Else: [*]
     } else {
       // regular edge
       lowerBound = 1;
       upperBound = 1;
     }
-    return new int[] { lowerBound, upperBound };
+    return new int[] {lowerBound, upperBound};
   }
 
   /**
@@ -745,21 +807,21 @@ class GDLLoader extends GDLBaseListener {
   private Comparison buildComparison(GDLParser.ComparisonExpressionContext ctx) {
     ComparableExpression lhs = extractComparableExpression(ctx.comparisonElement(0));
     ComparableExpression rhs = extractComparableExpression(ctx.comparisonElement(1));
-    Comparator comp = Comparator.fromString(ctx .ComparisonOP().getText());
+    Comparator comp = Comparator.fromString(ctx.ComparisonOP().getText());
 
     return new Comparison(lhs, comp, rhs);
   }
 
   /**
-   * Extracts a ComparableExpression from comparissonElement
+   * Extracts a ComparableExpression from comparison element
    *
    * @param element comparissonElement
    * @return extracted comparable expression
    */
   private ComparableExpression extractComparableExpression(GDLParser.ComparisonElementContext element) {
-    if(element.literal() != null) {
+    if (element.literal() != null) {
       return new Literal(getPropertyValue(element.literal()));
-    } else if(element.propertyLookup() != null) {
+    } else if (element.propertyLookup() != null) {
       return buildPropertySelector(element.propertyLookup());
     } else {
       return new ElementSelector(element.Identifier().getText());
@@ -773,20 +835,27 @@ class GDLLoader extends GDLBaseListener {
    * @return parsed property selector expression
    */
   private PropertySelector buildPropertySelector(GDLParser.PropertyLookupContext ctx) {
-    GraphElement element;
-
-    String identifier = ctx.Identifier(0).getText();
+    String identifier = resolveIdentifier(ctx.Identifier(0).getText());
     String property = ctx.Identifier(1).getText();
+    return new PropertySelector(identifier, property);
+  }
 
-    if(userVertexCache.containsKey(identifier)) {
+  /**
+   * Get the representation of the given identifier.
+   *
+   * @param identifier the identifier of the context
+   * @return the variable of the element
+   */
+  String resolveIdentifier(String identifier) {
+    GraphElement element;
+    if (userVertexCache.containsKey(identifier)) {
       element = userVertexCache.get(identifier);
-    }
-    else if(userEdgeCache.containsKey(identifier)) {
+    } else if (userEdgeCache.containsKey(identifier)) {
       element = userEdgeCache.get(identifier);
+    } else {
+      throw new InvalidReferenceException(identifier);
     }
-    else { throw new InvalidReferenceException(identifier);}
-
-    return new PropertySelector(element.getVariable(),property);
+    return element.getVariable();
   }
 
   // --------------------------------------------------------------------------------------------
@@ -805,8 +874,8 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Creates and returns an new graph identifier.
    *
-   * @return new graph identifier
    * @param variable GDL graph variable or none if anonymous
+   * @return new graph identifier
    */
   private Long getNewGraphId(Optional<String> variable) {
     return nextGraphId.apply(variable);
@@ -815,8 +884,8 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Creates and returns a new vertex identifier.
    *
-   * @return new vertex identifier
    * @param variable GDL vertex variable or none if anonymous
+   * @return new vertex identifier
    */
   private Long getNewVertexId(Optional<String> variable) {
     return nextVertexId.apply(variable);
@@ -825,8 +894,8 @@ class GDLLoader extends GDLBaseListener {
   /**
    * Creates and returns a new edge identifier.
    *
-   * @return new edge identifier
    * @param variable GDL edge variable or none if anonymous
+   * @return new edge identifier
    */
   private Long getNewEdgeId(Optional<String> variable) {
     return nextEdgeId.apply(variable);
@@ -840,11 +909,11 @@ class GDLLoader extends GDLBaseListener {
    * Creates a cache containing a mapping from variables to query elements. The cache is filled
    * with elements from the user cache and/or the auto cache depending on the specified flags.
    *
-   * @param userCache element user cache
-   * @param autoCache element auto cache
-   * @param includeUserDefined true, iff user cache elements shall be included
+   * @param userCache            element user cache
+   * @param autoCache            element auto cache
+   * @param includeUserDefined   true, iff user cache elements shall be included
    * @param includeAutoGenerated true, iff auto cache elements shall be included
-   * @param <T> query element type
+   * @param <T>                  query element type
    * @return immutable cache
    */
   private <T> Map<String, T> getCache(Map<String, T> userCache, Map<String, T> autoCache,
@@ -865,8 +934,8 @@ class GDLLoader extends GDLBaseListener {
    * @param newPredicates predicates to be added
    */
   private void addPredicates(List<Predicate> newPredicates) {
-    for(Predicate newPredicate : newPredicates) {
-      if(this.predicates == null) {
+    for (Predicate newPredicate : newPredicates) {
+      if (this.predicates == null) {
         this.predicates = newPredicate;
       } else {
         this.predicates = new And(this.predicates, newPredicate);
@@ -963,9 +1032,7 @@ class GDLLoader extends GDLBaseListener {
    * @return the parsed string
    */
   private String parseString(String in) {
-    return in.replaceAll("^.|.$", "")
-             .replaceAll("\\\\\"","\"")
-             .replaceAll("\\\\\'","'");
+    return in.replaceAll("^.|.$", "").replaceAll("\\\\\"", "\"").replaceAll("\\\\'", "'");
   }
 
 }

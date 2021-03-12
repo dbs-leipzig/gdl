@@ -16,11 +16,15 @@
 
 package org.s1ck.gdl.model.predicates.expressions;
 
+import org.s1ck.gdl.model.comparables.time.TimeAtom;
+import org.s1ck.gdl.model.comparables.time.TimePoint;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.comparables.ComparableExpression;
 import org.s1ck.gdl.utils.Comparator;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -30,15 +34,15 @@ public class Comparison implements Predicate {
   /**
    * Left hand side value
    */
-  private ComparableExpression lhs;
+  private final ComparableExpression lhs;
   /**
    * Right hand side value
    */
-  private ComparableExpression rhs;
+  private final ComparableExpression rhs;
   /**
    * The comparator used to compare a the values
    */
-  private Comparator comparator;
+  private final Comparator comparator;
 
   /**
    * Creates a new comparison operator
@@ -54,8 +58,7 @@ public class Comparison implements Predicate {
 
   @Override
   public Predicate[] getArguments() {
-    Predicate[] arguments = {};
-    return arguments;
+      return new Predicate[]{};
   }
 
   /**
@@ -71,8 +74,59 @@ public class Comparison implements Predicate {
    * @return lhs and rhs values
    */
   public ComparableExpression[] getComparableExpressions() {
-    ComparableExpression[] list = {lhs, rhs};
-    return list;
+      return new ComparableExpression[]{lhs, rhs};
+  }
+
+  @Override
+  public boolean isTemporal(){
+    //actually, time data can only be compared to time data (yet), thus it would suffices to check whether
+    // lhs is a TimePoint at the moment
+    return lhs instanceof TimePoint || rhs instanceof TimePoint;
+  }
+
+  @Override
+  public Predicate unfoldGlobalLeft(List<String> variables) {
+    // check whether there is something to do
+    if(!isTemporal() || !(lhs instanceof TimeAtom)){
+      return this;
+    }
+    return (((TimeAtom)lhs).unfoldGlobal(comparator, rhs, variables));
+
+  }
+
+  @Override
+  public Predicate replaceGlobalByLocal(List<String> variables) {
+    return new Comparison(lhs.replaceGlobalByLocal(variables),
+            comparator,
+            rhs.replaceGlobalByLocal(variables));
+  }
+
+  @Override
+  public Comparison switchSides(){
+    if(!isTemporal()){
+      return this;
+    }
+    Comparator newComp;
+    if(comparator == Comparator.EQ){
+      newComp = Comparator.EQ;
+    }
+    else if(comparator == Comparator.NEQ){
+      newComp = Comparator.NEQ;
+    }
+    else if(comparator == Comparator.GT){
+      newComp = Comparator.LT;
+    }
+    else if(comparator == Comparator.GTE){
+      newComp = Comparator.LTE;
+    }
+    else if(comparator == Comparator.LT){
+      newComp = Comparator.GT;
+    }
+    //LTE
+    else{
+      newComp = Comparator.GTE;
+    }
+    return new Comparison(rhs, newComp, lhs);
   }
 
   /**
@@ -82,11 +136,22 @@ public class Comparison implements Predicate {
   @Override
   public Set<String> getVariables() {
     Set<String> variables = new HashSet<>();
-    if(lhs.getVariable() != null) variables.add(lhs.getVariable());
-    if(rhs.getVariable() != null) variables.add(rhs.getVariable());
+    if(lhs.getVariables() != null) variables.addAll(lhs.getVariables());
+    if(rhs.getVariables() != null) variables.addAll(rhs.getVariables());
 
     return variables;
   }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return lhs.containsSelectorType(type) || rhs.containsSelectorType(type);
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return lhs.isGlobal() || rhs.isGlobal();
+  }
+
 
   @Override
   public String toString() {

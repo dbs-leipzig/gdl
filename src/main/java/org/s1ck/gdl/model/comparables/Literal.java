@@ -16,6 +16,12 @@
 
 package org.s1ck.gdl.model.comparables;
 
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 /**
  * Represents a literal like String, Integer, ...
  */
@@ -24,7 +30,7 @@ public class Literal implements ComparableExpression {
   /**
    * literal value
    */
-  private Object value;
+  private final Object value;
 
   /**
    * Creates a new Literal
@@ -39,13 +45,30 @@ public class Literal implements ComparableExpression {
     return value;
   }
 
-  /**
-   * Returns null since this does not reference a variable
-   * @return null
-   */
+
+  @Override
+  public Set<String> getVariables() {
+    return new HashSet<>();
+  }
+
+  @Override
+  public ComparableExpression replaceGlobalByLocal(List<String> variables) {
+    return this;
+  }
+
   @Override
   public String getVariable() {
     return null;
+  }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return false;
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return false;
   }
 
   @Override

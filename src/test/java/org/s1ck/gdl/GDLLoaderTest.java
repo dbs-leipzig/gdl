@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -196,7 +211,7 @@ public class GDLLoaderTest {
   }
 
   @Test
-  public void readEdgeWithNoLabelTest() throws Exception {
+  public void readEdgeWithNoLabelTest() {
     GDLLoader loader = getLoaderFromGDLString("()-[e]->()");
     Edge e = loader.getEdgeCache().get("e");
     assertEquals("edge has wrong label", loader.getDefaultEdgeLabel(), e.getLabel());
@@ -479,7 +494,7 @@ public class GDLLoaderTest {
   // --------------------------------------------------------------------------------------------
 
   @Test
-  public void testNonPredicateMatch() throws Exception {
+  public void testNonPredicateMatch() {
     String query = "MATCH (n)-[e]->(m)";
 
     GDLLoader loader = getLoaderFromGDLString(query);
@@ -734,7 +749,7 @@ public class GDLLoaderTest {
   }
 
   // string representation of all valid properties
-  private static String PROPERTIES_STRING;
+  private static final String PROPERTIES_STRING;
 
   // contains all valid properties
   private static final List<PropertyTriple<?>> PROPERTIES_LIST = new ArrayList<>();
@@ -745,9 +760,9 @@ public class GDLLoaderTest {
    * @param <T>
    */
   private static class PropertyTriple<T> {
-    private String key;
-    private String value;
-    private T expected;
+    private final String key;
+    private final String value;
+    private final T expected;
 
     public PropertyTriple(String key, String value, T expected) {
       this.key = key;

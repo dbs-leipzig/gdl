@@ -16,17 +16,19 @@
 
 package org.s1ck.gdl.model.predicates.booleans;
 
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 
+import java.util.List;
 import java.util.Set;
 
 public class Or implements Predicate {
 
   // left hand side
-  private Predicate lhs;
+  private final Predicate lhs;
 
   // right hand side
-  private Predicate rhs;
+  private final Predicate rhs;
 
   public Or(Predicate lhs, Predicate rhs) {
     this.lhs = lhs;
@@ -51,7 +53,50 @@ public class Or implements Predicate {
   }
 
   @Override
+  public Predicate switchSides(){
+    return new Or(lhs.switchSides(), rhs.switchSides());
+  }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return lhs.containsSelectorType(type) || rhs.containsSelectorType(type);
+  }
+
+  @Override
+  public boolean isTemporal(){
+    return lhs.isTemporal() || rhs.isTemporal();
+  }
+
+  @Override
+  public Predicate unfoldGlobalLeft(List<String> variables) {
+    return new Or(lhs.unfoldGlobalLeft(variables), rhs.unfoldGlobalLeft(variables));
+  }
+
+  @Override
+  public Predicate replaceGlobalByLocal(List<String> variables) {
+    return new Or(lhs.replaceGlobalByLocal(variables),
+            rhs.replaceGlobalByLocal(variables));
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return lhs.isGlobal() || rhs.isGlobal();
+  }
+
+  @Override
   public String toString() {
     return String.format("(%s OR %s)", lhs, rhs);
+  }
+
+  @Override
+  public boolean equals(Object o){
+    if(o==null){
+      return false;
+    }
+    if(!this.getClass().equals(o.getClass())){
+      return false;
+    }
+    Or that = (Or)o;
+    return (that.lhs.equals(this.lhs) && that.rhs.equals(this.rhs));
   }
 }

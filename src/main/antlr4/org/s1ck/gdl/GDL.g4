@@ -102,11 +102,14 @@ expression2 : atom ;
 
 atom : parenthesizedExpression
      | comparisonExpression
+     | timeFunc
+     | temporalComparison
      ;
 
 comparisonExpression
     : comparisonElement ComparisonOP comparisonElement
     ;
+
 
 comparisonElement
     : Identifier
@@ -136,6 +139,183 @@ literal
     | NaN
     | Null
     ;
+    
+//------------------------
+// time-related 
+//________________________
+
+// temporal query constraints
+
+temporalComparison
+    : timePoint ComparisonOP timePoint
+    ;
+
+timeFunc
+    : interval '.' intervalFunc             #intvF
+    | timePoint '.' stampFunc               #stmpF
+    ;
+
+// intervals
+
+interval
+    : intervalSelector
+    | intervalFromStamps
+    | complexInterval
+    ;
+
+intervalSelector
+    : Identifier '.' IntervalConst
+    | IntervalConst
+    ;
+
+intervalFromStamps
+    : 'Interval(' timePoint ',' timePoint ')'
+    ;
+
+complexInterval
+    : complexIntervalArgument '.merge(' complexIntervalArgument ')'
+    | complexIntervalArgument '.join(' complexIntervalArgument ')'
+    ;
+
+complexIntervalArgument
+    : intervalSelector
+    | intervalFromStamps
+    ;
+
+// time points
+
+timePoint
+    : timeLiteral
+    | timeSelector
+    | complexTimePoint
+    ;
+
+timeLiteral
+    : 'Timestamp(' timeStamp ')'
+    ;
+
+timeStamp
+    : Datetime
+    | Date
+    | Now;
+
+timeSelector
+    : Identifier '.' TimeProp
+    | TimeProp
+    ;
+
+complexTimePoint
+    : 'MAX(' complexTimePointArgument (',' complexTimePointArgument)+ ')'
+    | 'MIN(' complexTimePointArgument (',' complexTimePointArgument)+ ')'
+    ;
+
+complexTimePointArgument
+    : timeLiteral
+    | timeSelector
+    ;
+
+// interval functions
+
+intervalFunc
+            : overlapsIntervallOperator
+            | fromToOperator
+            | betweenOperator
+            | precedesOperator
+            | succeedsOperator
+            | containsOperator
+            | immediatelyPrecedesOperator
+            | immediatelySucceedsOperator
+            | equalsOperator
+            | longerThanOperator
+            | shorterThanOperator
+            | lengthAtLeastOperator
+            | lengthAtMostOperator
+            | asOfOperator
+            ;
+
+overlapsIntervallOperator
+    : 'overlaps(' interval ')'
+    ;
+
+fromToOperator
+    : 'fromTo(' timePoint ',' timePoint ')'
+    ;
+
+betweenOperator
+    : 'between(' timePoint ',' timePoint ')'
+    ;
+
+precedesOperator
+    : 'precedes(' interval ')'
+    ;
+
+succeedsOperator
+    : 'succeeds(' interval ')'
+    ;
+
+containsOperator
+    : 'contains(' interval ')'
+    | 'contains(' timePoint ')'
+    ;
+
+immediatelyPrecedesOperator
+    : 'immediatelyPrecedes(' interval ')'
+    ;
+
+immediatelySucceedsOperator
+    : 'immediatelySucceeds(' interval ')'
+    ;
+
+equalsOperator
+    : 'equals(' interval ')'
+    ;
+
+longerThanOperator
+    : 'longerThan(' (interval | timeConstant) ')'
+    ;
+
+shorterThanOperator
+    : 'shorterThan(' (interval | timeConstant) ')'
+    ;
+
+lengthAtLeastOperator
+    : 'lengthAtLeast(' (interval | timeConstant) ')'
+    ;
+
+lengthAtMostOperator
+    : 'lengthAtMost(' (interval | timeConstant) ')'
+    ;
+
+asOfOperator
+    : 'asOf(' timePoint ')'
+    ;
+
+timeConstant
+    : 'Millis(' IntegerLiteral ')'
+    | 'Seconds(' IntegerLiteral ')'
+    | 'Minutes(' IntegerLiteral ')'
+    | 'Hours(' IntegerLiteral ')'
+    | 'Days(' IntegerLiteral ')'
+    ;
+
+
+// time stamp/point functions
+
+stampFunc
+    : beforePointOperator
+    | afterPointOperator
+    | precedesOperator
+    | succeedsOperator
+    ;
+
+beforePointOperator
+    : 'before' '(' timePoint ')'
+    ;
+
+afterPointOperator
+    : 'after' '(' timePoint ')'
+    ;
+
 
 //-------------------------------
 // String Literal
@@ -232,6 +412,37 @@ ComparisonOP
     | '<='
     ;
 
+//_______________________________
+// Time lexing 
+//_______________________________
+
+TimeProp
+    : 'tx_from'
+    | 'tx_to'
+    | 'val_from'
+    | 'val_to'
+    ;
+
+IntervalConst
+    : 'tx'
+    | 'val'
+    ;
+
+Datetime
+    :  Digit Digit Digit Digit '-' Digit Digit '-' Digit Digit 'T'Time
+    ;
+
+Date
+    : Digit Digit Digit Digit '-' Digit Digit '-' Digit Digit?
+    ;
+
+Time
+    : Digit Digit ':' Digit Digit (':' Digit Digit)?
+    ;
+
+Now
+    : ('N'|'n')('O'|'o')('W'|'w')
+    ;
 
 //-------------------------------
 // General fragments

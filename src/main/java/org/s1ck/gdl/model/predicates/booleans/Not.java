@@ -16,13 +16,15 @@
 
 package org.s1ck.gdl.model.predicates.booleans;
 
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 
+import java.util.List;
 import java.util.Set;
 
 public class Not implements Predicate {
 
-  private Predicate expression;
+  private final Predicate expression;
 
   public Not(Predicate expression) {
     this.expression = expression;
@@ -30,8 +32,7 @@ public class Not implements Predicate {
 
   @Override
   public Predicate[] getArguments() {
-    Predicate[] arguments = {expression};
-    return arguments;
+      return new Predicate[]{expression};
   }
 
   /**
@@ -44,7 +45,49 @@ public class Not implements Predicate {
   }
 
   @Override
+  public Predicate switchSides(){
+    return new Not(expression.switchSides());
+  }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return expression.containsSelectorType(type);
+  }
+
+  @Override
+  public boolean isTemporal(){
+    return expression.isTemporal();
+  }
+
+  @Override
+  public Predicate unfoldGlobalLeft(List<String> variables) {
+    return new Not(expression.unfoldGlobalLeft(variables));
+  }
+
+  @Override
   public String toString() {
     return String.format("(NOT %s)", expression);
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return expression.isGlobal();
+  }
+
+  @Override
+  public Predicate replaceGlobalByLocal(List<String> variables) {
+    return new Not(expression.replaceGlobalByLocal(variables));
+  }
+
+  @Override
+  public boolean equals(Object o){
+    if(o==null){
+      return false;
+    }
+    if(!this.getClass().equals(o.getClass())){
+      return false;
+    }
+    Not that = (Not)o;
+    return that.expression.equals(this.expression);
   }
 }

@@ -16,17 +16,19 @@
 
 package org.s1ck.gdl.model.predicates.booleans;
 
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 
+import java.util.List;
 import java.util.Set;
 
 public class And implements Predicate {
 
   // left hand side
-  private Predicate lhs;
+  private final Predicate lhs;
 
   // right hand side
-  private Predicate rhs;
+  private final Predicate rhs;
 
   public And(Predicate lhs, Predicate rhs) {
     this.lhs = lhs;
@@ -51,7 +53,51 @@ public class And implements Predicate {
   }
 
   @Override
+  public Predicate switchSides(){
+    return new And(lhs.switchSides(), rhs.switchSides());
+  }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return lhs.containsSelectorType(type) || rhs.containsSelectorType(type);
+  }
+
+  @Override
+  public boolean isTemporal(){
+    return lhs.isTemporal() || rhs.isTemporal();
+  }
+
+  @Override
+  public Predicate unfoldGlobalLeft(List<String> variables) {
+    return new And(lhs.unfoldGlobalLeft(variables), rhs.unfoldGlobalLeft(variables));
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return lhs.isGlobal() || rhs.isGlobal();
+  }
+
+  @Override
+  public Predicate replaceGlobalByLocal(List<String> variables) {
+    return new And(lhs.replaceGlobalByLocal(variables),
+            rhs.replaceGlobalByLocal(variables));
+  }
+
+  @Override
   public String toString() {
     return String.format("(%s AND %s)", lhs, rhs);
   }
+
+  @Override
+  public boolean equals(Object o){
+    if(o==null){
+      return false;
+    }
+    if(!this.getClass().equals(o.getClass())){
+      return false;
+    }
+    And that = (And)o;
+    return (that.lhs.equals(this.lhs) && that.rhs.equals(this.rhs));
+  }
+
 }

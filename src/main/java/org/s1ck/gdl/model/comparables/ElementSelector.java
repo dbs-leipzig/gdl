@@ -16,6 +16,13 @@
 
 package org.s1ck.gdl.model.comparables;
 
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
 /**
  * Used to compare elements (by id)
  */
@@ -24,7 +31,7 @@ public class ElementSelector implements ComparableExpression {
   /**
    * Variable which identifies the element
    */
-  private String variable;
+  private final String variable;
 
   /**
    * Creates a new element selector
@@ -35,13 +42,31 @@ public class ElementSelector implements ComparableExpression {
     this.variable = variable;
   }
 
-  /**
-   * Returns the variable which references the element
-   * @return variable name
-   */
+  @Override
+  public Set<String> getVariables() {
+    HashSet<String> var = new HashSet<>();
+    var.add(variable);
+    return var;
+  }
+
   @Override
   public String getVariable() {
     return this.variable;
+  }
+
+  @Override
+  public ComparableExpression replaceGlobalByLocal(List<String> variables) {
+    return this;
+  }
+
+  @Override
+  public boolean containsSelectorType(TimeSelector.TimeField type){
+    return false;
+  }
+
+  @Override
+  public boolean isGlobal(){
+    return false;
   }
 
   @Override
@@ -57,7 +82,6 @@ public class ElementSelector implements ComparableExpression {
     ElementSelector that = (ElementSelector) o;
 
     return variable != null ? variable.equals(that.variable) : that.variable == null;
-
   }
 
   @Override
