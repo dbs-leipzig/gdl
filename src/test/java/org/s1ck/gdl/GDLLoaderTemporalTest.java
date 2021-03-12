@@ -1,9 +1,30 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl;
+
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.junit.Test;
-import org.s1ck.gdl.model.comparables.time.*;
+import org.s1ck.gdl.model.comparables.time.Duration;
+import org.s1ck.gdl.model.comparables.time.MaxTimePoint;
+import org.s1ck.gdl.model.comparables.time.MinTimePoint;
+import org.s1ck.gdl.model.comparables.time.TimeConstant;
+import org.s1ck.gdl.model.comparables.time.TimeLiteral;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.predicates.booleans.And;
 import org.s1ck.gdl.model.predicates.expressions.Comparison;
@@ -16,6 +37,9 @@ import static org.s1ck.gdl.utils.Comparator.*;
 
 public class GDLLoaderTemporalTest {
 
+    private static final String DEFAULT_GRAPH_LABEL = "DefaultGraph";
+    private static final String DEFAULT_VERTEX_LABEL = "DefaultVertex";
+    private static final String DEFAULT_EDGE_LABEL = "DefaultEdge";
 
     @Test
     public void periodLiteralTest(){
@@ -24,6 +48,7 @@ public class GDLLoaderTemporalTest {
         TimeLiteral tl1 = new TimeLiteral("1970-01-01");
         TimeLiteral tl2 = new TimeLiteral("1970-01-02");
 
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(),
                 new And(
                 new Comparison(
@@ -52,6 +77,7 @@ public class GDLLoaderTemporalTest {
                                 new TimeSelector("a", "tx_to"))
 
                 );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -71,6 +97,7 @@ public class GDLLoaderTemporalTest {
                         new TimeSelector("a", "tx_to")
                 )
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -90,6 +117,7 @@ public class GDLLoaderTemporalTest {
                         new TimeSelector("b", TX_FROM)
                 )
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -102,6 +130,7 @@ public class GDLLoaderTemporalTest {
                 LTE,
                 new TimeSelector("b", TimeSelector.TimeField.VAL_FROM)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         // timestamp as caller
@@ -112,6 +141,7 @@ public class GDLLoaderTemporalTest {
                 LTE,
                 new TimeSelector("b", TimeSelector.TimeField.VAL_FROM)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -124,6 +154,7 @@ public class GDLLoaderTemporalTest {
                 GTE,
                 new TimeSelector("b", TX_TO)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         // timestamp as caller
@@ -134,6 +165,7 @@ public class GDLLoaderTemporalTest {
                 GTE,
                 new TimeSelector("b", VAL_TO)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -153,22 +185,20 @@ public class GDLLoaderTemporalTest {
                         new TimeSelector("e", TX_TO)
                 )
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
-        loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
-        "WHERE e.val.asOf(a.tx_from");
+        loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) WHERE e.val.asOf(a.tx_from)");
         expected = new And(
+          new Comparison(
+            new TimeSelector("e", VAL_FROM),
+            LTE,
+            new TimeSelector("a", TX_FROM)),
         new Comparison(
-        new TimeSelector("e", VAL_FROM),
-        LTE,
-        new TimeSelector("a", TX_FROM)
-        ),
-        new Comparison(
-        new TimeSelector("a", TX_FROM),
-        LTE,
-        new TimeSelector("e", VAL_TO)
-        )
-        );
+          new TimeSelector("a", TX_FROM),
+          LTE,
+          new TimeSelector("e", VAL_TO)));
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -200,13 +230,17 @@ public class GDLLoaderTemporalTest {
             new Comparison(globalTxFrom, LTE, l2),
                 new Comparison(globalTxTo, GT, l1)
         ), globalTxPredicate);
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(expected1, loader.getPredicates().get());
 
         //only rhs global
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE Timestamp(1970-01-01).precedes(tx)");
-        //Predicate expected2 = new And(new Comparison(l1, LTE, globalFrom), globalFromPredicate);
-        //assertPredicateEquals(expected2, loader.getPredicates().get());
+        Predicate expected2 = new And(
+          new Comparison(l1, LTE, globalTxFrom),
+          globalTxPredicate);
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(expected2, loader.getPredicates().get());
 
         //both sides global
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -224,9 +258,7 @@ public class GDLLoaderTemporalTest {
         Predicate globalValPredicate = new Comparison(globalValFrom, LTE, globalValTo);
         Predicate expected3 = new And(
         new And(new Comparison(globalValTo, GT, globalTxFrom), globalTxPredicate), globalValPredicate);
-        //assertPredicateEquals(expectedProcessed3, resultProcessed3);
-        System.out.println(expected3);
-        System.out.println(loader.getPredicates().get());
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(expected3, loader.getPredicates().get());
 
     }
@@ -234,7 +266,7 @@ public class GDLLoaderTemporalTest {
     @Test
     public void intervalMergeAndJoinTest(){
         GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
-                "WHERE a.tx.merge(b.tx).succeeds(Interval(Timestamp(1970-01-01), Timestamp(2020-05-01) ))");
+                "WHERE a.tx.merge(b.tx).succeeds(Interval(Timestamp(1970-01-01), Timestamp(2020-05-01)))");
         TimeSelector aTxFrom = new TimeSelector("a", TX_FROM);
         TimeSelector aTxTo = new TimeSelector("a", TX_TO);
         TimeSelector bTxFrom = new TimeSelector("b", TX_FROM);
@@ -249,13 +281,14 @@ public class GDLLoaderTemporalTest {
                 new Comparison(new MaxTimePoint(aTxFrom, bTxFrom), LTE,
                 new MinTimePoint(aTxTo, bTxTo))
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(expected, loader.getPredicates().get());
 
         /*
          * Join
          */
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
-                "WHERE a.tx.join(b.tx).succeeds(Interval(Timestamp(1970-01-01), Timestamp(2020-05-01))");
+                "WHERE a.tx.join(b.tx).succeeds(Interval(Timestamp(1970-01-01), Timestamp(2020-05-01)))");
         expected = new And(
                 new And(
                 new Comparison(new MinTimePoint(aTxFrom, bTxFrom), GTE, tl2),
@@ -263,6 +296,7 @@ public class GDLLoaderTemporalTest {
                 new Comparison(new MaxTimePoint(aTxFrom, bTxFrom), LTE,
                 new MinTimePoint(aTxTo, bTxTo))
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(expected, loader.getPredicates().get());
 
         /*
@@ -280,6 +314,7 @@ public class GDLLoaderTemporalTest {
                 new Comparison(new MaxTimePoint(aTxFrom, bTxFrom), LTE, new
                         MinTimePoint(aTxTo, bTxTo))
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(expected, loader.getPredicates().get());
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -294,23 +329,25 @@ public class GDLLoaderTemporalTest {
                 new Comparison(new MaxTimePoint(aTxFrom, bTxFrom), LTE, new
                         MinTimePoint(aTxTo, bTxTo))
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
     @Test
     public void containsTest(){
-        GDLLoader loaderDoProcess = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
+        GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE a.tx.contains(b.val)");
         Predicate expected = new And(
                 new Comparison(new TimeSelector("a", TX_FROM), LTE, new TimeSelector("b", VAL_FROM)),
                 new Comparison(new TimeSelector("a", TX_TO), GTE, new TimeSelector("b", VAL_TO))
         );
-        assertPredicateEquals(expected, loaderDoProcess.getPredicates().get());
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(expected, loader.getPredicates().get());
     }
 
     @Test
     public void comparisonTest(){
-        GDLLoader loaderDoProcess = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
+        GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE a.tx_from > b.val_from AND Timestamp(2013-06-01) <= a.val_to");
         Predicate expected = new And(
                 new Comparison(new TimeSelector("a", TX_FROM), GT,
@@ -319,38 +356,42 @@ public class GDLLoaderTemporalTest {
                         new TimeSelector("a", VAL_TO)
                 )
         );
-        assertPredicateEquals(loaderDoProcess.getPredicates().get(), expected);
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
     @Test
     public void immediatelyPrecedesTest(){
-        GDLLoader loaderDoProcess = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
+        GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE a.tx.immediatelyPrecedes(e.val)");
         Predicate expected = new Comparison(
                 new TimeSelector("a", TX_TO), EQ, new TimeSelector("e", VAL_FROM)
         );
-        assertPredicateEquals(loaderDoProcess.getPredicates().get(), expected);
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
     @Test
     public void immediatelySucceedsTest(){
-        GDLLoader loaderDoProcess = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
+        GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE a.tx.immediatelySucceeds(e.val)");
         Predicate expected = new Comparison(
                 new TimeSelector("a", TX_FROM), EQ, new TimeSelector("e", VAL_TO)
         );
-        assertPredicateEquals(loaderDoProcess.getPredicates().get(), expected);
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
     @Test
     public void equalsTest(){
-        GDLLoader loaderDoProcess = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
+        GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE a.tx.equals(e.val)");
         Predicate expected = new And(
                 new Comparison(new TimeSelector("a", TX_FROM), EQ, new TimeSelector("e", VAL_FROM)),
                 new Comparison(new TimeSelector("a", TX_TO), EQ, new TimeSelector("e", VAL_TO))
         );
-        assertPredicateEquals(loaderDoProcess.getPredicates().get(), expected);
+        assertTrue(loader.getPredicates().isPresent());
+        assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
     @Test
@@ -369,6 +410,7 @@ public class GDLLoaderTemporalTest {
         Predicate expected = new Comparison(
                 new MinTimePoint(aTxFrom, bTxFrom, eTxFrom), LT, literal1
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
 
@@ -378,6 +420,7 @@ public class GDLLoaderTemporalTest {
         expected = new Comparison(
                 new MaxTimePoint(aTxFrom, bTxFrom, eTxFrom), LT, literal1
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
 
@@ -388,6 +431,7 @@ public class GDLLoaderTemporalTest {
                 new MaxTimePoint(aTxFrom, bTxFrom, eTxFrom), GT,
                 new MinTimePoint(aValTo, bValTo, eValTo)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
 
@@ -400,9 +444,8 @@ public class GDLLoaderTemporalTest {
                 ),
                 new Comparison(aTxFrom, GTE, new TimeSelector("b", TX_TO))
         );
-        //assertPredicateEquals(loaderDoProcess.getPredicates().get(), expected);
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
-
     }
 
     @Test
@@ -442,6 +485,7 @@ public class GDLLoaderTemporalTest {
 
         Predicate expected = new And(valDurationPred,
                 new Comparison(valDuration, comparator, eightyDays));
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -449,6 +493,7 @@ public class GDLLoaderTemporalTest {
         TimeConstant twelveHours = new TimeConstant(0,12,0,0,0);
         expected = new And(valDurationPred,
                 new Comparison(valDuration, comparator, twelveHours));
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -461,6 +506,7 @@ public class GDLLoaderTemporalTest {
         // !!! global interval
         expected = new And(new And(globalValPred,
                 new Comparison(globalValDuration, comparator, fiveMinutes)), globalValPred);
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -476,6 +522,7 @@ public class GDLLoaderTemporalTest {
                 new Comparison(mergeDuration, comparator, twentyHours)),
                 new Comparison(mergeFrom, LTE, mergeTo)
         );
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -498,6 +545,7 @@ public class GDLLoaderTemporalTest {
                 new Comparison(mergeFrom, LTE, mergeTo)
         );
 
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -510,6 +558,7 @@ public class GDLLoaderTemporalTest {
                     intervalDurationPred,
                     new Comparison(intervalDuration, comparator, fourDays)),
                 new Comparison(aValFrom, LTE, bValTo));
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -523,6 +572,7 @@ public class GDLLoaderTemporalTest {
                         aValPred, bValPred
                 ),
                 new Comparison(aVal, comparator, bVal));
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -544,8 +594,7 @@ public class GDLLoaderTemporalTest {
                 ),
                 new Comparison(globalValDuration, comparator, globalTxDuration)),
             globalTxPred), globalValPred);
-        System.out.println(loader.getPredicates().get());
-        System.out.println(expected);
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
 
         loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
@@ -559,6 +608,7 @@ public class GDLLoaderTemporalTest {
                 new And(globalValPred, constantPred),
         new Comparison(globalValDuration, comparator, constantInterval)),
         new Comparison(l1, LTE, l2)), globalValPred);
+        assertTrue(loader.getPredicates().isPresent());
         assertPredicateEquals(loader.getPredicates().get(), expected);
     }
 
@@ -566,7 +616,7 @@ public class GDLLoaderTemporalTest {
     public void timeLitNowTest(){
         GDLLoader loader = getLoaderFromGDLString("MATCH (a)-[e]->(b) " +
                 "WHERE Timestamp(Now)<=Timestamp(Now)");
-        System.out.println(loader.getPredicates());
+        assertTrue(loader.getPredicates().isPresent());
         Comparison comp = (Comparison) loader.getPredicates().get();
         // all "Now"s should have the exact same value
         assertEquals(comp.getComparableExpressions()[0], comp.getComparableExpressions()[1]);
@@ -575,20 +625,24 @@ public class GDLLoaderTemporalTest {
 
     /**
      * Does not fail iff {@code result==expected} or {@code result.switchSides()==expected}
+     *
      * @param result    predicate to compare
      * @param expected  predicate to compare
      */
     private void assertPredicateEquals(Predicate result, Predicate expected){
-        assertTrue(result.equals(expected) || result.switchSides().equals(expected)
-        || result.toString().equals(expected.toString()) ||
-                result.switchSides().toString().equals(expected.toString()));
+        assertTrue(
+          result.equals(expected)
+            || result.switchSides().equals(expected)
+            || result.toString().equals(expected.toString())
+            || result.switchSides().toString().equals(expected.toString()));
     }
 
-
-    private static final String DEFAULT_GRAPH_LABEL = "DefaultGraph";
-    private static final String DEFAULT_VERTEX_LABEL = "DefaultVertex";
-    private static final String DEFAULT_EDGE_LABEL = "DefaultEdge";
-
+    /**
+     * Creates a GDLLoader from the given string.
+     *
+     * @param gdlString the gdl string to parse
+     * @return a GDLLoader instance representing the gdl string
+     */
     private GDLLoader getLoaderFromGDLString(String gdlString){
         GDLLexer lexer = new GDLLexer(new ANTLRInputStream(gdlString));
         GDLParser parser = new GDLParser(new CommonTokenStream(lexer));

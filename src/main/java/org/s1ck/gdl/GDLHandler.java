@@ -167,6 +167,7 @@ public class GDLHandler {
 
   /**
    * Returns the literal for all "Now" literals in the query
+   *
    * @return literal for all "Now" literals in the query
    */
   public TimeLiteral getNowLit(){

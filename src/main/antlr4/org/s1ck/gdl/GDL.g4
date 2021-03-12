@@ -119,11 +119,9 @@ comparisonElement
 
 parenthesizedExpression : '(' expression ')' ;
 
-
 propertyLookup
     : Identifier '.' Identifier
     ;
-
 
 literal
     : StringLiteral
@@ -133,7 +131,6 @@ literal
     | NaN
     | Null
     ;
-    
     
 //------------------------
 // time-related 
@@ -147,8 +144,7 @@ temporalComparison
 
 timeFunc
     : interval '.' intervalFunc             #intvF
-    | timePoint '.' stampFunc                 #stmpF
-    //| Identifier '.asOf(' timePoint ')'   #asOf
+    | timePoint '.' stampFunc               #stmpF
     ;
 
 // intervals
@@ -209,7 +205,6 @@ complexTimePointArgument
     : timeLiteral
     | timeSelector
     ;
-
 
 // interval functions
 
@@ -412,6 +407,7 @@ ComparisonOP
 //_______________________________
 // Time lexing 
 //_______________________________
+
 TimeProp
     : 'tx_from'
     | 'tx_to'

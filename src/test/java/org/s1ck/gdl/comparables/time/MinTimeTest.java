@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl.comparables.time;
 
 import org.junit.Test;
@@ -21,6 +36,8 @@ public class MinTimeTest {
         TimeLiteral l4 = new TimeLiteral("2019-04-05");
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MinTimePoint mn = new MinTimePoint(l1,l2,l3,l4,l5);
+        assertTrue(mn.evaluate().isPresent());
+        assertTrue(l3.evaluate().isPresent());
         assertEquals(mn.evaluate().get(), l3.evaluate().get());
     }
 
@@ -67,6 +84,8 @@ public class MinTimeTest {
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MaxTimePoint mx2 = new MaxTimePoint(l3,l4,l5);
         MinTimePoint mn = new MinTimePoint(mx1,mx2);
+        assertTrue(mn.evaluate().isPresent());
+        assertTrue(l2.evaluate().isPresent());
         assertEquals(mn.evaluate().get(), l2.evaluate().get());
     }
 
@@ -80,6 +99,8 @@ public class MinTimeTest {
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MinTimePoint mn1 = new MinTimePoint(l3,l4,l5);
         MinTimePoint mn = new MinTimePoint(mx1,mn1);
+        assertTrue(mn.evaluate().isPresent());
+        assertTrue(l3.evaluate().isPresent());
         assertEquals(mn.evaluate().get(), l3.evaluate().get());
     }
 
@@ -144,6 +165,4 @@ public class MinTimeTest {
         assertTrue(new MinTimePoint(s1,global, l, global).isGlobal());
         assertFalse(new MinTimePoint(s1,l).isGlobal());
     }
-
-
 }

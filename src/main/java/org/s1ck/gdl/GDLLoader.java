@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.s1ck.gdl;
 
 import org.antlr.v4.runtime.RuleContext;
@@ -21,7 +20,8 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.s1ck.gdl.exceptions.InvalidReferenceException;
 import org.s1ck.gdl.model.*;
 import org.s1ck.gdl.model.comparables.ElementSelector;
-import org.s1ck.gdl.model.comparables.time.*;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
+import org.s1ck.gdl.model.comparables.time.TimeLiteral;
 import org.s1ck.gdl.model.predicates.booleans.And;
 import org.s1ck.gdl.model.predicates.expressions.Comparison;
 import org.s1ck.gdl.model.predicates.Predicate;
@@ -93,7 +93,6 @@ class GDLLoader extends GDLBaseListener {
      * Processes the temporal parts of the query
      */
     private final GDLLoaderTemporal temporalLoader;
-
 
     /**
      * Initializes a new GDL Loader.
@@ -437,17 +436,6 @@ class GDLLoader extends GDLBaseListener {
     }
 
     /**
-     * Builds a asOf {@code Predicate}.
-     * E.g.a.asOf(now) = a.tx_from<=now AND a.tx_from>=now
-     *
-     * @param ctx asOf context
-     */
-    /*@Override
-    public void enterAsOf(GDLParser.AsOfContext ctx) {
-        currentPredicates.add(temporalLoader.createAsOf(ctx));
-    }*/
-
-    /**
      * Returns the literal for all "Now" literals in the query
      * @return literal for all "Now" literals in the query
      */
@@ -541,7 +529,8 @@ class GDLLoader extends GDLBaseListener {
     }
 
     /**
-     * Processes a conjunctive expression (AND, OR, XOR) and connects the filter with the corresponding operator
+     * Processes a conjunctive expression (AND, OR, XOR) and connects the filter with the corresponding
+     * operator
      *
      * @param conjunctions list of conjunction operators
      */
@@ -764,10 +753,8 @@ class GDLLoader extends GDLBaseListener {
 
             } else if (children == 2) { // [*1]
                 lowerBound = terminalNodeToInt(lengthCtx.IntegerLiteral(0));
-            } else { // [*]
-                lowerBound = 0;
-                upperBound = 0;
             }
+            // Else: [*]
         } else {
             // regular edge
             lowerBound = 1;
@@ -818,6 +805,12 @@ class GDLLoader extends GDLBaseListener {
         return new PropertySelector(identifier, property);
     }
 
+    /**
+     * Get the representation of the given identifier.
+     *
+     * @param identifier the identifier of the context
+     * @return the variable of the element
+     */
     String resolveIdentifier(String identifier) {
         GraphElement element;
         if (userVertexCache.containsKey(identifier)) {

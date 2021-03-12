@@ -1,6 +1,24 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl.model.comparables.time;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Base class for more abstract TimestampExpressions that may combine several timestamps,
@@ -21,11 +39,12 @@ public abstract class TimeTerm extends TimePoint {
 
     /**
      * Initialize a complex expression by its arguments (TimePoints)
+     *
      * @param args the arguments
      */
-    protected TimeTerm(TimePoint...args){
+    protected TimeTerm(TimePoint... args){
         if(args.length < 2){
-            throw new IllegalArgumentException("need at least 2 arguments");
+            throw new IllegalArgumentException("At least two arguments are needed.");
         }
         this.args = new ArrayList<>();
         Collections.addAll(this.args, args);
@@ -33,6 +52,7 @@ public abstract class TimeTerm extends TimePoint {
 
     /**
      * Get the arguments list
+     *
      * @return list of arguments
      */
     public ArrayList<TimePoint> getArgs(){
@@ -40,7 +60,8 @@ public abstract class TimeTerm extends TimePoint {
     }
 
     /**
-     * set the list of arguments
+     * Set the list of arguments
+     *
      * @param args the desired list of arguments (not empty)
      */
     public void setArgs(ArrayList<TimePoint> args){
@@ -61,6 +82,7 @@ public abstract class TimeTerm extends TimePoint {
 
     /**
      * String representation of the operator (e.g. "MIN", "MAX",...)
+     *
      * @return operator string
      */
     public String getOperator(){

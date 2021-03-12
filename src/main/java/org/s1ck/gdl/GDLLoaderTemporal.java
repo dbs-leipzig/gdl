@@ -1,7 +1,28 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl;
 
 import org.s1ck.gdl.model.comparables.ComparableExpression;
-import org.s1ck.gdl.model.comparables.time.*;
+import org.s1ck.gdl.model.comparables.time.Duration;
+import org.s1ck.gdl.model.comparables.time.MaxTimePoint;
+import org.s1ck.gdl.model.comparables.time.MinTimePoint;
+import org.s1ck.gdl.model.comparables.time.TimeConstant;
+import org.s1ck.gdl.model.comparables.time.TimeLiteral;
+import org.s1ck.gdl.model.comparables.time.TimePoint;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.predicates.booleans.And;
 import org.s1ck.gdl.model.predicates.expressions.Comparison;
@@ -11,7 +32,11 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
-import static org.s1ck.gdl.utils.Comparator.*;
+import static org.s1ck.gdl.utils.Comparator.EQ;
+import static org.s1ck.gdl.utils.Comparator.LT;
+import static org.s1ck.gdl.utils.Comparator.LTE;
+import static org.s1ck.gdl.utils.Comparator.GT;
+import static org.s1ck.gdl.utils.Comparator.GTE;
 
 /**
  * Responsible for processing the temporal aspects of a query within {@link GDLLoader}
@@ -83,7 +108,7 @@ public class GDLLoaderTemporal {
      */
     private TimeLiteral buildTimeLiteral(GDLParser.TimeLiteralContext ctx) {
         GDLParser.TimeStampContext stamp = ctx.timeStamp();
-        if(stamp.getText().trim().toLowerCase().equals("now")){
+        if(stamp.getText().trim().equalsIgnoreCase("now")){
             return new TimeLiteral(nowLit.getMilliseconds());
         } else{
             return new TimeLiteral(stamp.getText().trim());
@@ -239,9 +264,8 @@ public class GDLLoaderTemporal {
         TimePoint x = buildTimePoint(ctx.timePoint(0));
         TimePoint y = buildTimePoint(ctx.timePoint(1));
         return new And(
-                new Comparison(from, Comparator.LT, y),
-                new Comparison(to, Comparator.GT, x)
-        );
+          new Comparison(from, Comparator.LT, y),
+          new Comparison(to, Comparator.GT, x));
     }
 
     /**
@@ -256,9 +280,8 @@ public class GDLLoaderTemporal {
         TimePoint x = buildTimePoint(ctx.timePoint(0));
         TimePoint y = buildTimePoint(ctx.timePoint(1));
         return new And(
-                new Comparison(from, LTE, y),
-                new Comparison(to, Comparator.GT, x)
-        );
+          new Comparison(from, LTE, y),
+          new Comparison(to, Comparator.GT, x));
     }
 
     /**
@@ -334,16 +357,15 @@ public class GDLLoaderTemporal {
             TimePoint arg_from = arg[0];
             TimePoint arg_to = arg[1];
             return new And(
-                    new Comparison(from, LTE, arg_from),
-                    new Comparison(to, GTE, arg_to)
-            );
+              new Comparison(from, LTE, arg_from),
+              new Comparison(to, GTE, arg_to));
         }
         // argument is only a timestamp
         else {
             TimePoint arg = buildTimePoint(ctx.timePoint());
             return new And(
-                    new Comparison(from, LTE, arg), new Comparison(to, GTE, arg)
-            );
+              new Comparison(from, LTE, arg),
+              new Comparison(to, GTE, arg));
         }
     }
 
@@ -360,9 +382,8 @@ public class GDLLoaderTemporal {
         TimePoint arg_from = arg[0];
         TimePoint arg_to = arg[1];
         return new And(
-                new Comparison(from, EQ, arg_from),
-                new Comparison(to, EQ, arg_to)
-        );
+          new Comparison(from, EQ, arg_from),
+          new Comparison(to, EQ, arg_to));
     }
 
     /**
@@ -482,11 +503,9 @@ public class GDLLoaderTemporal {
     private Predicate createAsOfPredicates(TimePoint from, TimePoint to,
                                            GDLParser.AsOfOperatorContext ctx){
         TimePoint arg = buildTimePoint(ctx.timePoint());
-        Predicate asOfPredicate = new And(
+        return new And(
             new Comparison(from, LTE, arg),
-            new Comparison(arg, LTE, to)
-        );
-        return asOfPredicate;
+            new Comparison(arg, LTE, to));
     }
 
     /**
@@ -537,8 +556,9 @@ public class GDLLoaderTemporal {
                     .complexIntervalArgument(1);
             boolean join = ctx.getText().contains(".join(");
             return buildIntervalFromComplex(arg1, arg2, join);
+        } else {
+            throw new IllegalArgumentException("Can not parse two time points from the given interval ctx.");
         }
-        return null;
     }
 
     /**
@@ -611,17 +631,18 @@ public class GDLLoaderTemporal {
         );
         predicateStack.addFirst(constraint);
         // now build complex interval from i1, i2
+        TimePoint start;
+        TimePoint end;
         if (join) {
-            TimePoint start = new MinTimePoint(i1[0], i2[0]);
-            TimePoint end = new MaxTimePoint(i1[1], i2[1]);
-            return new TimePoint[]{start, end};
+            start = new MinTimePoint(i1[0], i2[0]);
+            end = new MaxTimePoint(i1[1], i2[1]);
         }
         // merge
         else {
-            TimePoint start = new MaxTimePoint(i1[0], i2[0]);
-            TimePoint end = new MinTimePoint(i1[1], i2[1]);
-            return new TimePoint[]{start, end};
+            start = new MaxTimePoint(i1[0], i2[0]);
+            end = new MinTimePoint(i1[1], i2[1]);
         }
+        return new TimePoint[]{start, end};
     }
 
     /**
@@ -687,27 +708,6 @@ public class GDLLoaderTemporal {
         TimePoint x = buildTimePoint(ctx.timePoint());
         return new Comparison(from, Comparator.GT, x);
     }
-
-    /**
-     * Create asOf predicate: a.tx_from<=point AND a.tx_to>= point
-     * @param ctx asOf context
-     * @return  predicate
-     */
-   /* Predicate createAsOf(GDLParser.AsOfContext ctx) {
-        TimePoint tp = buildTimePoint(ctx.timePoint());
-        String identifier = loader.resolveIdentifier(ctx.Identifier().getText());
-        return new And(
-                        new Comparison(
-                                new TimeSelector(identifier, TimeSelector.TimeField.TX_FROM),
-                                LTE,
-                                tp),
-                        new Comparison(
-                                new TimeSelector(identifier, TimeSelector.TimeField.TX_TO),
-                                GTE,
-                                tp)
-
-        );
-    }*/
 
     /**
      * Returns the literal for all "Now" literals in the query

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.s1ck.gdl.model.predicates;
 
 import org.s1ck.gdl.model.GraphElement;
@@ -87,12 +86,14 @@ public interface Predicate extends Serializable {
   /**
    * Returns an equivalent predicate, but arguments in each comparison are switched
    * switches right-hand side with left-hand side of each comparison and changes the comparator accordingly
+   *
    * @return equivalent predicate with rhs and lhs of comparisons switched
    */
   Predicate switchSides();
 
   /**
    * Checks whether a certain type of selector (val_from, val_to, tx_from, tx_to) is contained
+   *
    * @param type the type of selector (val_from, val_to, tx_from, tx_to)
    * @return true iff the specified type of selector is contained
    */
@@ -100,12 +101,14 @@ public interface Predicate extends Serializable {
 
   /**
    * Checks whether the query contains temporal elements
+   *
    * @return true iff the query contains temporal elements
    */
   boolean isTemporal();
 
   /**
    * Checks whether the query contains a global selector
+   *
    * @return true iff the query contains a global selector
    */
   boolean isGlobal();
@@ -113,6 +116,7 @@ public interface Predicate extends Serializable {
   /**
    * "Translates" a predicate possibly containing global time predicates to a predicate
    * containing only local time comparisons. Only unfolds the left side(!!!)
+   *
    * @param variables the variables in the whole query
    * @return translated predicate (only left side "translated"!!!)
    */
@@ -123,9 +127,9 @@ public interface Predicate extends Serializable {
    * over all local variables.
    * E.g., {@code __global.val_from} would be replaced by {@code MAX(v1.val_from,...,
    * vn.val_from)} for variables {@code v1,...,vn}.
+   *
    * @param variables all query variables
-   * @return predicate with global selectors replaced by their local variable equivalent
-   * expressions
+   * @return predicate with global selectors replaced by their local variable equivalent expressions
    */
   Predicate replaceGlobalByLocal(List<String> variables);
 

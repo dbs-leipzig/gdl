@@ -1,6 +1,25 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl.comparables.time;
+
 import org.junit.Test;
-import org.s1ck.gdl.model.comparables.time.*;
+import org.s1ck.gdl.model.comparables.time.MaxTimePoint;
+import org.s1ck.gdl.model.comparables.time.MinTimePoint;
+import org.s1ck.gdl.model.comparables.time.TimeLiteral;
+import org.s1ck.gdl.model.comparables.time.TimeSelector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,9 +36,9 @@ public class MaxTimeTest {
         TimeLiteral l4 = new TimeLiteral("2019-04-05");
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MaxTimePoint mx = new MaxTimePoint(l1,l2,l3,l4,l5);
+        assertTrue(mx.evaluate().isPresent());
+        assertTrue(l5.evaluate().isPresent());
         assertEquals(mx.evaluate().get(), l5.evaluate().get());
-/*        assertEquals(mx.getLowerBound(), mx.getUpperBound());
-        assertEquals(mx.getUpperBound(), (long)mx.evaluate().get());*/
     }
 
     @Test
@@ -62,6 +81,8 @@ public class MaxTimeTest {
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MinTimePoint mn2 = new MinTimePoint(l3,l4,l5);
         MaxTimePoint mx = new MaxTimePoint(mn1,mn2);
+        assertTrue(mx.evaluate().isPresent());
+        assertTrue(l1.evaluate().isPresent());
         assertEquals(mx.evaluate().get(), l1.evaluate().get());
     }
 
@@ -75,6 +96,8 @@ public class MaxTimeTest {
         TimeLiteral l5 = new TimeLiteral("2019-04-05T01:02:31");
         MaxTimePoint mx1 = new MaxTimePoint(l3,l4,l5);
         MaxTimePoint mx = new MaxTimePoint(mn1,mx1);
+        assertTrue(mx.evaluate().isPresent());
+        assertTrue(l5.evaluate().isPresent());
         assertEquals(mx.evaluate().get(), l5.evaluate().get());
     }
 

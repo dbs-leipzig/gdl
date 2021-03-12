@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl.model.comparables.time;
 
 import org.s1ck.gdl.model.comparables.ComparableExpression;
@@ -20,6 +35,7 @@ public class TimeConstant extends TimePoint {
 
     /**
      * Create a constant of size days+hours+minutes+seconds+millis (in millis)
+     *
      * @param days number of days
      * @param hours number of hours [0-23]
      * @param minutes number of minutes [0-59]
@@ -37,6 +53,7 @@ public class TimeConstant extends TimePoint {
 
     /**
      * Creates a constant from the given milliseconds
+     *
      * @param millis size of the constant in milliseconds
      */
     public TimeConstant(long millis){
@@ -45,6 +62,7 @@ public class TimeConstant extends TimePoint {
 
     /**
      * Return the wrapped number of milliseconds
+     *
      * @return number of milliseconds
      */
     public long getMillis(){

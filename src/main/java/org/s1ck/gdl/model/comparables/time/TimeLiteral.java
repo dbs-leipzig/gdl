@@ -1,13 +1,34 @@
+/*
+ * Copyright 2017 The GDL Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.s1ck.gdl.model.comparables.time;
 
 import org.s1ck.gdl.model.comparables.ComparableExpression;
 import org.s1ck.gdl.model.predicates.Predicate;
 import org.s1ck.gdl.model.predicates.expressions.Comparison;
-
-import java.time.*;
-import java.util.*;
-
 import org.s1ck.gdl.utils.Comparator;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Represents a constant Timestamp. Wraps a java.time.LocalDateTime
@@ -21,6 +42,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * Construct a Literal from UNIX epoch milliseconds
+     *
      * @param millis milliseconds since 1970-01-01T00:00
      */
     public TimeLiteral(long millis){
@@ -30,21 +52,20 @@ public class TimeLiteral extends TimeAtom {
     /**
      * Constructs a literal from a given string of the form YYYY-MM-DDTHH:MM(:SS) or YYYY-MM-DD
      * or "now"
+     *
      * @param date the string to construct the DateTime from
      */
     public TimeLiteral(String date){
         try {
-            if(date.toLowerCase().equals("now")){
+            if(date.equalsIgnoreCase("now")){
                 this.time = LocalDateTime.now();
             }
             else{
                 date = preprocessDateString(date);
                 this.time = LocalDateTime.parse(date);
             }
-
-        }
-        catch(Exception e){
-            throw new IllegalArgumentException("Date string not in the right format");
+        } catch(DateTimeParseException e) {
+            throw new IllegalArgumentException("Date string has the wrong format.");
         }
     }
 
@@ -62,6 +83,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * UNIX epoch milliseconds of the wrapped DateTime
+     *
      * @return UNIX epoch milliseconds
      */
     public long getMilliseconds(){
@@ -70,6 +92,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The year of the wrapped datetime
+     *
      * @return year as int
      */
     public int getYear(){
@@ -78,6 +101,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The month of the wrapped datetime
+     *
      * @return month as int
      */
     public int getMonth(){
@@ -86,6 +110,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The day within the month of the wrapped datetime
+     *
      * @return month as int
      */
     public int getDay(){
@@ -94,6 +119,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The hour of the wrapped datetime
+     *
      * @return hour as int
      */
     public int getHour(){
@@ -102,6 +128,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The minute within the hour of the wrapped datetime
+     *
      * @return minute as int
      */
     public int getMinute(){
@@ -110,6 +137,7 @@ public class TimeLiteral extends TimeAtom {
 
     /**
      * The second within the minute of the wrapped datetime
+     *
      * @return second as int
      */
     public int getSecond(){
@@ -157,6 +185,7 @@ public class TimeLiteral extends TimeAtom {
      * Utility method to handle input strings like 1970-01-01. They are not recognized by LocalDateTime.
      * Thus they must be augmented to e.g. 1970-01-01T00:00
      * Error handling is not done here, but when the LocalDateTime is constructed
+     *
      * @param date the string input
      * @return the (possibly) augmented string input
      */
