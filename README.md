@@ -1,6 +1,6 @@
-[![Build Status](https://github.com/s1ck/gdl/workflows/Java%20CI/badge.svg)](https://github.com/s1ck/gdl/actions?workflow=Java+CI)
+[![Build Status](https://github.com/dbs-leipzig/gdl/workflows/Java%20CI/badge.svg)](https://github.com/dbs-leipzig/gdl/actions?workflow=Java+CI)
 
-## GDL - Graph Definition Language
+## Temporal-GDL - Temporal Graph Definition Language
 
 > Now with bitemporal modeling of vertices and edges.
 

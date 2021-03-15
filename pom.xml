@@ -11,8 +11,8 @@
     <artifactId>gradoop-gdl</artifactId>
     <version>0.5.2</version>
 
-    <name>GDL - Graph Definition Language</name>
-    <description>ANTLR Grammar for the definition of extended property graphs.</description>
+    <name>Temporal-GDL - Temporal Graph Definition Language</name>
+    <description>ANTLR Grammar for the definition of temporal extended property graphs.</description>
 
     <licenses>
         <license>
