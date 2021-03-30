@@ -4,16 +4,12 @@
 
 > Now with bitemporal modeling of vertices and edges.
 
-Inspired by the popular graph query language [Cypher](http://neo4j.com/docs/stable/cypher-query-lang.html),
-which is implemented in [Neo4j](http://neo4j.com/), I started developing an [ANTLR](http://www.antlr.org/)
-grammar to define property graphs. I added the concept of _logical graphs_ into the language to support multiple, 
-possible overlapping property graphs in one database. 
+This projected has been forked from [GDL](https://github.com/s1ck/gdl). 
+GDL has initially been built for testing and pattern matching in [Gradoop](https://github.com/dbs-leipzig/gradoop), but it now used in several other projects.
+Since GDL is intended to be general and aligned with the property graph model, we forked the project and extended the language with temporal aspects.
 
-GDL is used for unit testing and graph definition in [Gradoop](https://github.com/dbs-leipzig/gradoop), a framework for 
-distributed temporal graph analytics.
-
-The project contains the grammar and a listener implementation which transforms GDL scripts into
-property graph model elements (i.e. graphs, vertices and edges).
+For more information on GDL, visit the [original project](https://github.com/s1ck/gdl).
+The following description is an extended description of the language specification.
 
 ## Data model
 
